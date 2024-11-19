@@ -82,8 +82,12 @@ volumes:
         `docker-compose.yml file created for instance ${instanceId}.`,
       );
 
-      // Running docker-compose to start services for this instance
-      await execAsync('docker compose up -d', { cwd: instanceDir });
+      const isWindows = process.platform === 'win32';
+      const dockerCommand = isWindows
+        ? 'docker-compose up -d'
+        : 'docker compose up -d';
+
+      await execAsync(dockerCommand, { cwd: instanceDir });
       console.log(`Docker services started for instance ${instanceId}.`);
 
       // Retrieve the WordPress container name without `grep`
@@ -166,19 +170,4 @@ volumes:
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  findAll() {
-    return `This action returns all setup`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} setup`;
-  }
-
-  update(id: number, updateSetupDto: UpdateSetupDto) {
-    return `This action updates a #${id} setup`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} setup`;
-  }
 }
