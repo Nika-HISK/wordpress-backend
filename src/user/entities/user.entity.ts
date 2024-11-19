@@ -1,7 +1,8 @@
-import { RefreshEntity } from "src/auth/entities/refresh.entity";
-import { Role } from "src/auth/enum/role.enum";
-import { baseEntity } from "src/base/entities/base.entity";
-import { Column, Entity, OneToMany } from "typeorm";
+import { RefreshEntity } from 'src/auth/entities/refresh.entity';
+import { Role } from 'src/auth/enum/role.enum';
+import { baseEntity } from 'src/base/entities/base.entity';
+import { Setup } from 'src/setup/entities/setup.entity';
+import { Column, Entity, OneToMany } from 'typeorm';
 
 @Entity()
 export class User extends baseEntity {
@@ -9,13 +10,13 @@ export class User extends baseEntity {
   firstName: string;
 
   @Column()
-  lastName:string
+  lastName: string;
 
   @Column()
-  email:string
+  email: string;
 
   @Column()
-  password:string
+  password: string;
 
   @Column({
     type: 'enum',
@@ -24,9 +25,9 @@ export class User extends baseEntity {
   })
   role: Role;
 
-
+  @OneToMany(() => Setup, (setup) => setup.user)
+  setup: Setup[];
 
   @OneToMany(() => RefreshEntity, (refreshToken) => refreshToken.user)
   refreshTokens: RefreshEntity[];
 }
-
