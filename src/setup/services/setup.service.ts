@@ -83,7 +83,7 @@ volumes:
       );
 
       // Running docker-compose to start services for this instance
-      await execAsync('docker-compose up -d', { cwd: instanceDir });
+      await execAsync('docker compose up -d', { cwd: instanceDir });
       console.log(`Docker services started for instance ${instanceId}.`);
 
       // Retrieve the WordPress container name without `grep`
