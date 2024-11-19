@@ -34,7 +34,6 @@ export class AuthService {
 
 
   async login(createUserDto: CreateUserDto) {
-    console.log('baro');
 
     const { email, password } = createUserDto;
 

@@ -22,7 +22,6 @@ import { Role } from '../enum/role.enum';
     ) {}
   
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        console.log('Guard triggered'); 
         const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
           context.getHandler(),
           context.getClass(),
@@ -34,7 +33,7 @@ import { Role } from '../enum/role.enum';
         const request = context.switchToHttp().getRequest<Request>();
         const token = request.cookies['accessToken'];
 
-        console.log(request.cookies)
+        // console.log(request.cookies)
       
         if (!token) {
           console.log('No token found');
@@ -46,16 +45,16 @@ import { Role } from '../enum/role.enum';
             secret: process.env.JWT_SECRET
           });
 
-          console.log('payloa')
+        //   console.log('payloa')
       
           const user = await this.userRepository.findOne(payload.sub);
           request.user = user;
+          
 
-
-          console.log(user)
+        //   console.log(user)
       
           const requiredRoles = this.getRequiredRoles(context);
-          console.log(requiredRoles)
+        //   console.log(requiredRoles)
           if (requiredRoles.length) {
             return requiredRoles.some((role) => payload.role === role);
           }
