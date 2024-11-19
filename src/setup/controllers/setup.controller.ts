@@ -46,23 +46,5 @@ export class SetupController {
     }
   }
 
-  @Get()
-  findAll() {
-    return this.setupService.findAll();
-  }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.setupService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateSetupDto: UpdateSetupDto) {
-    return this.setupService.update(+id, updateSetupDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.setupService.remove(+id);
-  }
 }
