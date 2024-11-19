@@ -17,7 +17,7 @@ export class Setup extends baseEntity {
   siteTitle: string;
 
   @Column({unique:true})
-  instanceDir: string;
+  containerName: string;
 
   @Column()
   instancePort:number

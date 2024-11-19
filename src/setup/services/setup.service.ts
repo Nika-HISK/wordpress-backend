@@ -83,7 +83,7 @@ volumes:
       );
 
       // Running docker-compose to start services for this instance
-      await execAsync('docker-compose up -d', { cwd: instanceDir });
+      await execAsync('docker compose up -d', { cwd: instanceDir });
       console.log(`Docker services started for instance ${instanceId}.`);
 
       // Retrieve the WordPress container name without `grep`
@@ -148,7 +148,7 @@ volumes:
       await execAsync(
         `docker exec ${wordpressContainerName} wp plugin install wordpress-importer --activate --allow-root`,
       );
-      await this.setupRepository.SaveUserWordpress(config,instanceDir,instancePort,id)
+      await this.setupRepository.SaveUserWordpress(config,wordpressContainerName,instancePort,id)
       return `WordPress setup complete for instance ${instanceId} on port ${instancePort}!`;
       
     } catch (error) {
