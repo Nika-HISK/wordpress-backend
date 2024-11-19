@@ -22,6 +22,9 @@ export class Setup extends baseEntity {
   @Column()
   instancePort:number
 
+  @Column()
+  userId:number
+
   @ManyToOne(() => User, (user) => user.setup)
   @JoinColumn({ name: 'userId' }) 
   user: User;

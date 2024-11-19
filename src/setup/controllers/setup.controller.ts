@@ -28,7 +28,6 @@ export class SetupController {
   async setupWordpress(@Body() body: CreateSetupDto, @Req() req: any) {
     
     try {      
-      console.log(req.user.id);
       
       const generateInstanceId = (): string => {
         const randomPart = require('crypto').randomBytes(8).toString('hex');
@@ -39,7 +38,7 @@ export class SetupController {
         await this.setupService.setupWordpress(
         body,
         instanceId,
-       
+       req.user.id
       );
      
     } catch (error) {

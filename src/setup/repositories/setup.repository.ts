@@ -11,8 +11,16 @@ export class SetupRepository {
     private readonly setupRepository: Repository<Setup>,
   ) {}
 
-  async SaveUserWordpress(createSetupDto:CreateSetupDto,instanceDir:string,instancePort:number ){
-    const newUser = new Setup();
+  async SaveUserWordpress(createSetupDto:CreateSetupDto,instanceDir:string,instancePort:number,id:number ){
+    const newSetup = new Setup();
+    newSetup.wpAdminUser = createSetupDto.wpAdminUser
+    newSetup.wpAdminEmail = createSetupDto.wpAdminEmail
+    newSetup.wpAdminPassword = createSetupDto.wpAdminPassword
+    newSetup.siteTitle = createSetupDto.siteTitle
+    newSetup.instancePort = instancePort
+    newSetup.instanceDir = instanceDir
+    newSetup.userId = id
+    this.setupRepository.save(newSetup);
     
   }
 }
