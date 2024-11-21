@@ -47,4 +47,22 @@ export class SetupController {
   }
 
 
+  @Roles(Role.USER)
+  @Get('wordpress')
+  async findAll() {
+    return await this.setupService.findAll()
+  }
+
+  @Roles(Role.USER)
+  @Get('/wordpress:id')
+  async findOne(@Param('id') id: string) {
+    return await this.setupService.findOne(Number(id));
+  }
+
+  @Roles(Role.USER)
+  @Delete('/wordpress:id')
+  async remove(@Param('id') id: string) {
+    return await this.setupService.deleteWorpress(Number(id));
+  }
+
 }

@@ -73,7 +73,7 @@ export class AuthService {
 
       const newAccessToken = await this.jwtService.signAsync(
         { sub: user.id, email: user.email, role: user.role },
-        { secret: process.env.JWT_SECRET, expiresIn: process.env.JWT_ACCESS_EXP},
+        { secret: process.env.JWT_SECRET, expiresIn: process.env.JWT_REFRESH_EXP},
       );
 
       return { accessToken: newAccessToken };

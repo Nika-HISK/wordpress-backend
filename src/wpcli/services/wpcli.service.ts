@@ -158,4 +158,50 @@ export class wpcliService {
     await this.execWpCli(userId, `user add-role ${targetUserId} ${role}`);
     return `User with ID ${targetUserId} role has been updated to ${role}`;
   }
+
+
+  async wpSearchReplace(
+    userId: number,
+    search: string,
+    replace: string,
+    options: Record<string, any> = {},
+  ): Promise<string> {
+    const containerName = await this.getContainerName(userId);
+  
+    const args: string[] = ['search-replace', search, replace];
+  
+    if (options.tables) {
+      args.push(...options.tables); 
+    }
+  
+    for (const [key, value] of Object.entries(options)) {
+      if (key === 'tables') continue; 
+  
+      if (typeof value === 'boolean') {
+        if (value) args.push(`--${key}`);
+      } else if (value !== undefined) {
+        args.push(`--${key}=${value}`);
+      }
+    }
+  
+    const escapedCommand = shellEscape(args);
+  
+    try {
+      const { stdout, stderr } = await execAsync(
+        `docker exec ${containerName} wp ${escapedCommand} --allow-root`,
+      );
+  
+      if (stderr) {
+        console.warn(`WP-CLI stderr: ${stderr}`);
+      }
+  
+      return stdout.trim();
+    } catch (error) {
+      console.error(`Command execution failed: ${error.message}`);
+      throw new Error(error.message);
+    }
+  }
+  
+  
+
 }

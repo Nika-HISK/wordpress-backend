@@ -22,5 +22,19 @@ export class SetupRepository {
     newSetup.userId = id
     this.setupRepository.save(newSetup);
     
+  } 
+
+  async deleteUser(id:number) {
+    return await this.setupRepository.softDelete(id)
   }
+
+  async findAll() {
+    return await this.setupRepository.find()
+  }
+
+
+   async findOne(id:number) {
+    return await this.setupRepository.findOneBy({id})
+  }
+  
 }

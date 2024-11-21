@@ -170,4 +170,16 @@ volumes:
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+
+  async deleteWorpress(id:number) {
+    return await this.setupRepository.deleteUser(id)
+  }
+
+  async findAll() {
+    return await this.setupRepository.findAll()
+  }
+
+  async findOne(id:number) {
+    return await this.setupRepository.findOne(id)
+  }
 }
