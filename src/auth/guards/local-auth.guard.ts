@@ -61,7 +61,6 @@ import { Role } from '../enum/role.enum';
       
           return true;
         } catch (err) {
-          console.log('Token verification failed');
           throw new ForbiddenException('Invalid token.');
         }
       }
