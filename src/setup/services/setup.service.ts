@@ -182,4 +182,9 @@ volumes:
   async findOne(id:number) {
     return await this.setupRepository.findOne(id)
   }
+
+  async findByTitle() {
+    return await this.setupRepository.findByTitle()
+  }
+
 }
