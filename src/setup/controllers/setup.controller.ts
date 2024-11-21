@@ -65,4 +65,10 @@ export class SetupController {
     return await this.setupService.deleteWorpress(Number(id));
   }
 
+
+  @Roles(Role.USER)
+  @Get('bytitle')
+  async findBytitle() {
+    return await this.setupService.findByTitle()
+  }
 }

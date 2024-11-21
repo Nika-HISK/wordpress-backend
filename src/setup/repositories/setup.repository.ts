@@ -32,6 +32,14 @@ export class SetupRepository {
     return await this.setupRepository.find()
   }
 
+  async findByTitle() {
+    const sites = await this.setupRepository.find({
+      select: ['siteTitle'], 
+    });
+  
+    return sites;
+  }
+
 
    async findOne(id:number) {
     return await this.setupRepository.findOneBy({id})

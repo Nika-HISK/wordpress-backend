@@ -1,6 +1,7 @@
 import { RefreshEntity } from 'src/auth/entities/refresh.entity';
 import { Role } from 'src/auth/enum/role.enum';
 import { baseEntity } from 'src/base/entities/base.entity';
+import { FileEntity } from 'src/files/entities/file.entity';
 import { Setup } from 'src/setup/entities/setup.entity';
 import { Column, Entity, OneToMany } from 'typeorm';
 
@@ -30,4 +31,7 @@ export class User extends baseEntity {
 
   @OneToMany(() => RefreshEntity, (refreshToken) => refreshToken.user)
   refreshTokens: RefreshEntity[];
+
+  @OneToMany(() => FileEntity, (files) => files.user)
+  files:FileEntity[]
 }
