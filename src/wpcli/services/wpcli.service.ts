@@ -9,6 +9,8 @@ import { Repository } from 'typeorm';
 import { Setup } from 'src/setup/entities/setup.entity';
 import { promisify } from 'util';
 import { exec } from 'child_process';
+import shellEscape from 'shell-escape';
+
 
 const execAsync = promisify(exec);
 
