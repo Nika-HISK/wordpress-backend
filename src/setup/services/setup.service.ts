@@ -9,10 +9,9 @@ import { SetupRepository } from '../repositories/setup.repository';
 
 const execAsync = promisify(exec);
 
-
 @Injectable()
 export class SetupService {
-  constructor(private readonly setupRepository:SetupRepository) {}
+  constructor(private readonly setupRepository: SetupRepository) {}
   private usedPorts: Set<number> = new Set();
   private portRange = { min: 4000, max: 8000 };
   private getAvailablePort(): number {
@@ -24,13 +23,12 @@ export class SetupService {
     }
     throw new Error('No available ports in the specified range.');
   }
-  async setupWordpress(config: CreateSetupDto, instanceId: string, id: number, ): Promise<string> {
-    const {
-      wpAdminUser,
-      wpAdminPassword,
-      wpAdminEmail,
-      siteTitle,
-    } = config;
+  async setupWordpress(
+    config: CreateSetupDto,
+    instanceId: string,
+    id: number,
+  ): Promise<string> {
+    const { wpAdminUser, wpAdminPassword, wpAdminEmail, siteTitle } = config;
     const instancePort = this.getAvailablePort();
     try {
       console.log(`Starting WordPress setup for instance ${instanceId}...`);
@@ -152,9 +150,13 @@ volumes:
       await execAsync(
         `docker exec ${wordpressContainerName} wp plugin install wordpress-importer --activate --allow-root`,
       );
-      await this.setupRepository.SaveUserWordpress(config,wordpressContainerName,instancePort,id)
+      await this.setupRepository.SaveUserWordpress(
+        config,
+        wordpressContainerName,
+        instancePort,
+        id,
+      );
       return `WordPress setup complete for instance ${instanceId} on port ${instancePort}!`;
-      
     } catch (error) {
       console.error(
         `Error during WordPress setup for instance ${instanceId}:`,
@@ -162,29 +164,28 @@ volumes:
       );
       throw new Error(`WordPress setup failed for instance ${instanceId}`);
     }
-
   }
-
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-
-  async deleteWorpress(id:number) {
-    return await this.setupRepository.deleteUser(id)
+  async deleteWorpress(id: number) {
+    return await this.setupRepository.deleteUser(id);
   }
 
   async findAll() {
-    return await this.setupRepository.findAll()
+    return await this.setupRepository.findAll();
   }
 
-  async findOne(id:number) {
-    return await this.setupRepository.findOne(id)
+  async findOne(id: number) {
+    return await this.setupRepository.findOne(id);
   }
 
   async findByTitle() {
-    return await this.setupRepository.findByTitle()
+    return await this.setupRepository.findByTitle();
   }
-
+  async findByport() {
+    return await this.setupRepository.findByport()
+  }
 }
