@@ -7,10 +7,9 @@ import {
   Param,
   Get,
 } from '@nestjs/common';
-import { LocalAuthGuard } from 'src/auth/guards/local-auth.guard';
 import { wpcliService } from '../services/wpcli.service';
-import { Roles } from 'src/auth/guards/roles.guard';
-import { Role } from 'src/auth/enum/role.enum';
+import { Roles } from 'src/auth/guard/jwt-roles.guard';
+import { Role } from 'src/auth/guard/enum/role.enum';
 
 @Controller('wp-cli')
 export class wpcliController {
