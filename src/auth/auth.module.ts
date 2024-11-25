@@ -1,37 +1,30 @@
 import { Module } from '@nestjs/common';
-import { AuthService } from './services/auth.service';
-import { AuthController } from './controllers/auth.controller';
-import { UserModule } from 'src/user/user.module';
-import { PassportModule } from '@nestjs/passport';
-import { JwtModule, JwtService } from '@nestjs/jwt';
-import { LocalStrategy } from './strategies/local.strategy';
-import { ConfigService } from '@nestjs/config';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { RefreshEntity } from './entities/refresh.entity';
 import { User } from 'src/user/entities/user.entity';
-import { Auth } from './entities/auth.entity';
-import { RefreshRepository } from './repositories/refresh.repository';
-import { LocalAuthGuard } from './guards/local-auth.guard';
-import { UserRepository } from 'src/user/repositories/user.repository'; 
-import { Setup } from 'src/setup/entities/setup.entity';
-
+import { UserModule } from 'src/user/user.module';
+import { APP_GUARD } from '@nestjs/core';
+import { AuthGuard } from './guard/jwt-auth.guard';
+import { jwtConfig } from 'src/config/config';
+import { UserService } from 'src/user/services/user.service';
 @Module({
   imports: [
-    UserModule, 
-    PassportModule,
-    JwtModule.register({global: true}),
-    TypeOrmModule.forFeature([User, RefreshEntity, Auth, Setup]), 
+    UserModule,
+    TypeOrmModule.forFeature([User]),
+    JwtModule.register({
+      secret: process.env.JWT_SECRET,
+      signOptions: { expiresIn: process.env.JWT_ACCESS_EXP },
+    }),
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    LocalStrategy,
-    ConfigService,
-    JwtService,
-    RefreshRepository,
-    LocalAuthGuard,
-    UserRepository, 
-  ],
-  exports:[AuthModule]
+  providers: [AuthService, UserService, 
+      {
+        provide: APP_GUARD,
+        useClass: AuthGuard,
+      },
+    ],
+  exports: [AuthService],
 })
 export class AuthModule {}

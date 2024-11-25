@@ -4,11 +4,11 @@ import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './user/user.module';
-import { AuthModule } from './auth/auth.module';
 import { SetupModule } from './setup/setup.module';
 import { WpcliModule } from './wpcli/wpcli.module';
 import { FilesModule } from './files/files.module';
 import { AwsModule } from './aws/aws.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -23,8 +23,8 @@ import { AwsModule } from './aws/aws.module';
       autoLoadEntities:true,
       synchronize: true,
     }),
-    UserModule,
     AuthModule,
+    UserModule,
     SetupModule,
     WpcliModule,
     FilesModule,
