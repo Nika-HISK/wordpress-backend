@@ -13,12 +13,12 @@ import {
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { UpdateSetupDto } from '../dto/update-setup.dto';
 import { SetupService } from '../services/setup.service';
-import { LocalAuthGuard } from 'src/auth/guards/local-auth.guard';
-import { Roles } from 'src/auth/guards/roles.guard';
-import { Role } from 'src/auth/enum/role.enum';
+import { AuthGuard } from 'src/auth/guard/jwt-auth.guard';
+import { Roles } from 'src/auth/guard/jwt-roles.guard';
+import { Role } from 'src/auth/guard/enum/role.enum';
 
 
-@UseGuards(LocalAuthGuard)
+// @UseGuards(AuthGuard)
 @Controller('setup')
 export class SetupController {
   constructor(private readonly setupService: SetupService) {}
@@ -47,27 +47,27 @@ export class SetupController {
   }
 
 
-  @Roles(Role.USER)
+  // @Roles(Role.USER)
   @Get('wordpress')
   async findAll() {
     return await this.setupService.findAll()
   }
 
-  @Roles(Role.USER)
+  // @Roles(Role.USER)
   @Get('/wordpress:id')
   async findOne(@Param('id') id: string) {
     return await this.setupService.findOne(Number(id));
   }
 
-  @Roles(Role.USER)
+  // @Roles(Role.USER)
   @Delete('/wordpress:id')
   async remove(@Param('id') id: string) {
     return await this.setupService.deleteWorpress(Number(id));
   }
 
 
-  @Roles(Role.USER)
-  @Get('bytitle')
+  // @Roles(Role.USER)
+  @Get('sitetitle')
   async findBytitle() {
     return await this.setupService.findByTitle()
   }

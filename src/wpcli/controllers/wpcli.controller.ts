@@ -12,7 +12,6 @@ import { wpcliService } from '../services/wpcli.service';
 import { Roles } from 'src/auth/guards/roles.guard';
 import { Role } from 'src/auth/enum/role.enum';
 
-@UseGuards(LocalAuthGuard)
 @Controller('wp-cli')
 export class wpcliController {
   constructor(private readonly wpCliService: wpcliService) {}

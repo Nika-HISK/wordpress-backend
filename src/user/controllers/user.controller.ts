@@ -2,13 +2,11 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { UserService } from '../services/user.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
-import { Roles } from 'src/auth/guards/roles.guard';
-import { Role } from 'src/auth/enum/role.enum';
-import { LocalAuthGuard } from 'src/auth/guards/local-auth.guard';
 import { UserRepository } from '../repositories/user.repository';
+import { Roles } from 'src/auth/guard/jwt-roles.guard';
+import { Role } from 'src/auth/guard/enum/role.enum';
 
 
-@UseGuards(LocalAuthGuard)
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService, private readonly userRepository:UserRepository) {}
@@ -24,16 +22,19 @@ export class UserController {
     return await this.userService.findAll();
   }
 
+  @Roles(Role.USER)
   @Patch(':id/change-password')
   changePassword(@Param('id') id: string, @Body('password') currentPassword: string,  @Body('password') newPassword: string) {
     return this.userService.updatePassword(Number(id),currentPassword ,newPassword);
   }
 
+  @Roles(Role.ADMIN)
   @Get(':id')
   async findOne(@Param('id') id: string,  @Body() newPassword: string) {
     return await this.userService.findOne(+id);
   }
 
+  @Roles(Role.USER)
   @Patch(':id')
   async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return await this.userService.update(+id, updateUserDto);

@@ -1,5 +1,4 @@
-import { RefreshEntity } from 'src/auth/entities/refresh.entity';
-import { Role } from 'src/auth/enum/role.enum';
+import { Role } from 'src/auth/guard/enum/role.enum';
 import { baseEntity } from 'src/base/entities/base.entity';
 import { FileEntity } from 'src/files/entities/file.entity';
 import { Setup } from 'src/setup/entities/setup.entity';
@@ -26,11 +25,12 @@ export class User extends baseEntity {
   })
   role: Role;
 
+  @Column({default:false})
+  banned:boolean 
+  
   @OneToMany(() => Setup, (setup) => setup.user)
   setup: Setup[];
 
-  @OneToMany(() => RefreshEntity, (refreshToken) => refreshToken.user)
-  refreshTokens: RefreshEntity[];
 
   @OneToMany(() => FileEntity, (files) => files.user)
   files:FileEntity[]
