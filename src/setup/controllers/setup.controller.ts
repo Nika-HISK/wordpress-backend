@@ -71,4 +71,16 @@ export class SetupController {
   async findBytitle() {
     return await this.setupService.findByTitle()
   }
+  
+  @Roles(Role.USER)
+  @Get('wordpress/port')
+  async findByport(){
+    return await this.setupService.findByport()
+  }
+
+  @Roles(Role.USER)
+  @Get('wordpress/username')
+  async findByusername(){
+    return await this.setupService.findByport()
+  }
 }
