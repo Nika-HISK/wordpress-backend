@@ -236,4 +236,11 @@ export class wpcliService {
     );
     return JSON.parse(output);
   }
+  async wpDbSize(userId: number): Promise<any> {
+    const output = await this.execWpCli(
+      userId,
+      'db size --format=json',
+    );
+    return JSON.parse(output);
+  }
 }

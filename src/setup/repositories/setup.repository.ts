@@ -52,4 +52,12 @@ export class SetupRepository {
     return port
   }
   
+  async findByusername(){
+    const username = await this.setupRepository.find({
+      select:['wpAdminUser']
+    })
+    return username
+  }
+  
+
 }

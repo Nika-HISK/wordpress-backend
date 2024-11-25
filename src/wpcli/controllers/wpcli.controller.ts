@@ -170,4 +170,10 @@ export class wpcliController {
   async wpCoreCheckUpdate(@Req() req: any) {
     return this.wpCliService.wpCoreCheckUpdate(req.user.id);
   }
+
+  @Roles(Role.USER)
+  @Get('db/size')
+  async wpDbSize(@Req() req: any) {
+    return this.wpCliService.wpDbSize(req.user.id);
+  }
 }

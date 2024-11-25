@@ -11,9 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CreateSetupDto } from '../dto/create-setup.dto';
-import { UpdateSetupDto } from '../dto/update-setup.dto';
 import { SetupService } from '../services/setup.service';
-import { AuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
 
@@ -47,26 +45,26 @@ export class SetupController {
   }
 
 
-  // @Roles(Role.USER)
+  @Roles(Role.USER)
   @Get('wordpress')
   async findAll() {
     return await this.setupService.findAll()
   }
 
-  // @Roles(Role.USER)
+  @Roles(Role.USER)
   @Get('/wordpress:id')
   async findOne(@Param('id') id: string) {
     return await this.setupService.findOne(Number(id));
   }
 
-  // @Roles(Role.USER)
+  @Roles(Role.USER)
   @Delete('/wordpress:id')
   async remove(@Param('id') id: string) {
     return await this.setupService.deleteWorpress(Number(id));
   }
 
 
-  // @Roles(Role.USER)
+  @Roles(Role.USER)
   @Get('sitetitle')
   async findBytitle() {
     return await this.setupService.findByTitle()
@@ -81,6 +79,6 @@ export class SetupController {
   @Roles(Role.USER)
   @Get('wordpress/username')
   async findByusername(){
-    return await this.setupService.findByport()
+    return await this.setupService.findByusername()
   }
 }

@@ -188,4 +188,9 @@ volumes:
   async findByport() {
     return await this.setupRepository.findByport()
   }
+
+  async findByusername(){
+    return await this.setupRepository.findByusername()
+  }
+  
 }
