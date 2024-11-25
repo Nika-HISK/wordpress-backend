@@ -44,5 +44,12 @@ export class SetupRepository {
    async findOne(id:number) {
     return await this.setupRepository.findOneBy({id})
   }
+
+  async findByport(){
+    const port = await this.setupRepository.find({
+      select:['instancePort']
+    })
+    return port
+  }
   
 }
