@@ -150,6 +150,10 @@ volumes:
       await execAsync(
         `docker exec ${wordpressContainerName} wp plugin install wordpress-importer --activate --allow-root`,
       );
+      
+      await execAsync(
+        `docker exec ${wordpressContainerName} chown -R www-data:www-data /var/www/html`,
+      );
       await this.setupRepository.SaveUserWordpress(
         config,
         wordpressContainerName,
