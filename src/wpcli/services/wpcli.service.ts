@@ -153,24 +153,15 @@ export class wpcliService {
     return this.execWpCli(userId, `plugin update ${plugin}`);
   }
   async wpUserList(userId: number): Promise<any> {
-    const output = await this.execWpCli(userId, 'user list --format=json');
+    const output = await this.execWpCli(userId, 'user list --format=json --fields=ID,first_name,last_name,user_email,roles');
     return JSON.parse(output);
   }
 
-  // Delete a user in WordPress
   async wpUserDelete(userId: number, targetUserId: number): Promise<string> {
-    const user = await this.execWpCli(userId, `user get ${targetUserId}`);
-    if (!user) {
-      throw new NotFoundException(
-        `User with ID ${targetUserId} not found in WordPress`,
-      );
-    }
-
-    await this.execWpCli(userId, `user delete ${targetUserId}`);
+    await this.execWpCli(userId, `user delete ${targetUserId} --yes`);
     return `User with ID ${targetUserId} has been deleted from WordPress`;
   }
 
-  // Update user role in WordPress
   async wpUserRoleUpdate(
     userId: number,
     targetUserId: number,
@@ -241,6 +232,11 @@ export class wpcliService {
       userId,
       'db size --format=json',
     );
+    return JSON.parse(output);
+  }
+
+  async wpRoleList(userId: number): Promise<any> {
+    const output = await this.execWpCli(userId, 'role list --format=json');
     return JSON.parse(output);
   }
 }

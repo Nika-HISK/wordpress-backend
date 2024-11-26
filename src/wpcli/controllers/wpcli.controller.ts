@@ -1,15 +1,7 @@
-import {
-  Controller,
-  Body,
-  Post,
-  Req,
-  Param,
-  Get,
-} from '@nestjs/common';
+import { Controller, Body, Post, Req, Param, Get } from '@nestjs/common';
 import { wpcliService } from '../services/wpcli.service';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
-
 
 @Controller('wp-cli')
 export class wpcliController {
@@ -51,7 +43,6 @@ export class wpcliController {
   ) {
     return this.wpCliService.wpMaintenance(req.user.id, mode);
   }
-
 
   @Roles(Role.USER)
   @Post('search-replace')
@@ -167,4 +158,11 @@ export class wpcliController {
   async wpDbSize(@Req() req: any) {
     return this.wpCliService.wpDbSize(req.user.id);
   }
+
+  @Roles(Role.USER)
+  @Get('wprole/list')
+  async getRoles(@Req() req: any) {
+    return this.wpCliService.wpRoleList(req.user.id);
+  }
+
 }

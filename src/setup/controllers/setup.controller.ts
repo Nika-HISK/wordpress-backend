@@ -14,6 +14,7 @@ import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupService } from '../services/setup.service';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
+import { Throttle } from '@nestjs/throttler';
 
 
 // @UseGuards(AuthGuard)
@@ -21,6 +22,7 @@ import { Role } from 'src/auth/guard/enum/role.enum';
 export class SetupController {
   constructor(private readonly setupService: SetupService) {}
 
+  @Throttle({ default: { limit: 1, ttl: 2000 } })
   @Roles(Role.USER)
   @Post('wordpress')
   async setupWordpress(@Body() body: CreateSetupDto, @Req() req: any) {
