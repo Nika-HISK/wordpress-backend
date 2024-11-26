@@ -109,7 +109,7 @@ export class wpcliService {
     return this.execWpCli(userId, `theme update ${theme}`);
   }
   async wpPluginList(userId: number): Promise<any> {
-    const output = await this.execWpCli(userId, `plugin list --format=json`);
+    const output = await this.execWpCli(userId, `plugin list --status=active,inactive --format=json`);
     return JSON.parse(output);
   }
 

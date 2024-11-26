@@ -3,13 +3,13 @@ import {
   Body,
   Post,
   Req,
-  UseGuards,
   Param,
   Get,
 } from '@nestjs/common';
 import { wpcliService } from '../services/wpcli.service';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
+
 
 @Controller('wp-cli')
 export class wpcliController {
@@ -52,15 +52,6 @@ export class wpcliController {
     return this.wpCliService.wpMaintenance(req.user.id, mode);
   }
 
-  @Roles(Role.USER)
-  @Post('plugin/:subCommand')
-  async wpPlugin(
-    @Req() req: any,
-    @Param('subCommand') subCommand: string,
-    @Body('args') args: string,
-  ) {
-    return this.wpCliService.wpPlugin(req.user.id, subCommand, args);
-  }
 
   @Roles(Role.USER)
   @Post('search-replace')
