@@ -1,4 +1,4 @@
-import { Controller, Body, Post, Req, Param, Get } from '@nestjs/common';
+import { Controller, Body, Post, Req, Param, Get, Query } from '@nestjs/common';
 import { wpcliService } from '../services/wpcli.service';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
@@ -73,8 +73,8 @@ export class wpcliController {
 
   @Roles(Role.USER)
   @Get('theme/list')
-  async wpThemeList(@Req() req: any) {
-    return this.wpCliService.wpThemeList(req.user.id);
+  async wpThemeList(@Req() req: any, @Query('search') search?: string) {
+    return this.wpCliService.wpThemeList(req.user.id, search);
   }
 
   @Roles(Role.USER)
@@ -97,8 +97,8 @@ export class wpcliController {
 
   @Roles(Role.USER)
   @Get('plugin/list')
-  async wpPluginList(@Req() req: any) {
-    return this.wpCliService.wpPluginList(req.user.id);
+  async wpPluginList(@Req() req: any, @Query('search') search?: string) {
+    return this.wpCliService.wpPluginList(req.user.id, search);
   }
 
   @Roles(Role.USER)
@@ -127,9 +127,10 @@ export class wpcliController {
 
   @Roles(Role.USER)
   @Get('wpuser/list')
-  async wpUserList(@Req() req: any) {
-    return this.wpCliService.wpUserList(req.user.id);
+  async wpUserList(@Req() req: any, @Query('search') search?: string) {
+    return this.wpCliService.wpUserList(req.user.id, search);
   }
+  
 
   @Roles(Role.USER)
   @Post('wpuser/delete')
@@ -145,6 +146,11 @@ export class wpcliController {
     @Body('role') role: string,
   ) {
     return this.wpCliService.wpUserRoleUpdate(req.user.id, userId, role);
+  }
+  @Roles(Role.USER)
+  @Get('core/version')
+  async wpCoreVersion(@Req() req: any) {
+    return this.wpCliService.wpCoreVersion(req.user.id);
   }
 
   @Roles(Role.USER)
@@ -164,5 +170,4 @@ export class wpcliController {
   async getRoles(@Req() req: any) {
     return this.wpCliService.wpRoleList(req.user.id);
   }
-
 }

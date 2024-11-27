@@ -83,9 +83,18 @@ export class wpcliService {
     return this.execWpCli(userId, `plugin ${subCommand} ${args}`);
   }
 
-  async wpThemeList(userId: number): Promise<any> {
-    const output = await this.execWpCli(userId, `theme list --format=json`);
-    return JSON.parse(output);
+  async wpThemeList(userId: number, search?: string): Promise<any> {
+    const command = `theme list --format=json`;
+    const output = await this.execWpCli(userId, command);
+    const themes = JSON.parse(output);
+  
+    if (search) {
+      return themes.filter(theme =>
+        theme.name?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+  
+    return themes;
   }
 
   async wpThemeActivate(userId: number, theme: string): Promise<string> {
@@ -108,11 +117,19 @@ export class wpcliService {
     }
     return this.execWpCli(userId, `theme update ${theme}`);
   }
-  async wpPluginList(userId: number): Promise<any> {
-    const output = await this.execWpCli(userId, `plugin list --status=active,inactive --format=json`);
-    return JSON.parse(output);
+  async wpPluginList(userId: number, search?: string): Promise<any> {
+    const command = 'plugin list --status=active,inactive --format=json';
+    const output = await this.execWpCli(userId, command);
+    const plugins = JSON.parse(output);
+  
+    if (search) {
+      return plugins.filter(plugin =>
+        plugin.name?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+  
+    return plugins;
   }
-
   async wpPluginActivate(userId: number, plugin: string): Promise<string> {
     if (!plugin) {
       throw new HttpException(
@@ -152,11 +169,21 @@ export class wpcliService {
     }
     return this.execWpCli(userId, `plugin update ${plugin}`);
   }
-  async wpUserList(userId: number): Promise<any> {
-    const output = await this.execWpCli(userId, 'user list --format=json --fields=ID,first_name,last_name,user_email,roles');
-    return JSON.parse(output);
+  async wpUserList(userId: number, search?: string): Promise<any> {
+    const command = 'user list --format=json --fields=ID,first_name,last_name,user_email,roles';
+    const output = await this.execWpCli(userId, command);
+    const users = JSON.parse(output);
+  
+    if (search) {
+      return users.filter(user =>
+        user.first_name?.toLowerCase().includes(search.toLowerCase()) ||
+        user.last_name?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+  
+    return users;
   }
-
+  
   async wpUserDelete(userId: number, targetUserId: number): Promise<string> {
     await this.execWpCli(userId, `user delete ${targetUserId} --yes`);
     return `User with ID ${targetUserId} has been deleted from WordPress`;
@@ -174,7 +201,7 @@ export class wpcliService {
       );
     }
 
-    await this.execWpCli(userId, `user add-role ${targetUserId} ${role}`);
+    await this.execWpCli(userId, `user update ${targetUserId} --role=${role}`);
     return `User with ID ${targetUserId} role has been updated to ${role}`;
   }
 
@@ -221,11 +248,14 @@ export class wpcliService {
   }
 
   async wpCoreCheckUpdate(userId: number): Promise<any> {
-    const output = await this.execWpCli(
-      userId,
-      'core check-update --format=json --fields=version,update_type',
-    );
-    return JSON.parse(output);
+    const output = await this.execWpCli(userId, 'core check-update --format=json');
+    const updates = JSON.parse(output);
+  
+    if (updates.length === 0) {
+      return { message: 'No updates available for WordPress core.' };
+    }
+  
+    return updates;
   }
   async wpDbSize(userId: number): Promise<any> {
     const output = await this.execWpCli(
@@ -238,5 +268,11 @@ export class wpcliService {
   async wpRoleList(userId: number): Promise<any> {
     const output = await this.execWpCli(userId, 'role list --format=json');
     return JSON.parse(output);
+  }
+
+  async wpCoreVersion(userId: number): Promise<object> {
+    const output = await this.execWpCli(userId, 'core version');
+    const version = {version:output}
+    return version
   }
 }
