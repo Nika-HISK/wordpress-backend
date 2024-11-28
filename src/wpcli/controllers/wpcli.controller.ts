@@ -170,4 +170,10 @@ export class wpcliController {
   async getRoles(@Req() req: any) {
     return this.wpCliService.wpRoleList(req.user.id);
   }
+
+  @Roles(Role.USER)
+  @Get('php/version')
+  async wpGetPhpVersion(@Req() req: any): Promise<any> {
+    return this.wpCliService.wpGetPhpVersion(req.user.id);
+  }
 }

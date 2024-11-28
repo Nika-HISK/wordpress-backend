@@ -83,4 +83,9 @@ export class SetupController {
   async findByusername(){
     return await this.setupService.findByusername()
   }
+  @Roles(Role.USER)
+  @Delete('delete/wordpress')
+  async deleteContainerAndVolumes(@Body('containerName') containerName: string): Promise<string> {
+    return this.setupService.deleteContainerAndVolumes(containerName);
+  }
 }

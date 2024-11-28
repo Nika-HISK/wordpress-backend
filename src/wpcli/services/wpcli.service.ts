@@ -20,7 +20,7 @@ export class wpcliService {
     private readonly setupRepository: Repository<Setup>,
   ) {}
 
-  // Fetch the container name based on user ID
+
   private async getContainerName(userId: number): Promise<string> {
     const setup = await this.setupRepository.findOne({
       where: { userId },
@@ -36,7 +36,7 @@ export class wpcliService {
     return setup.containerName;
   }
 
-  // Execute WP-CLI commands in the user's Docker container
+
   private async execWpCli(userId: number, command: string): Promise<string> {
     const containerName = await this.getContainerName(userId);
 
@@ -56,6 +56,7 @@ export class wpcliService {
 
   async wpGetMaintenanceStatus(userId: number): Promise<string> {
     return this.execWpCli(userId, `maintenance-mode status`);
+    
   }
 
   async wpMaintenance(
@@ -274,5 +275,15 @@ export class wpcliService {
     const output = await this.execWpCli(userId, 'core version');
     const version = {version:output}
     return version
+  }
+
+  async wpGetPhpVersion(userId: number): Promise<object> {
+    const output = await this.execWpCli(userId, '--info --format=json');
+    const info = JSON.parse(output);
+    if (!info.php_version) {
+      throw new Error('PHP version information not found in WP-CLI output.');
+    }
+    const phpVerion = {phpVersion:info.php_version}
+    return phpVerion;
   }
 }

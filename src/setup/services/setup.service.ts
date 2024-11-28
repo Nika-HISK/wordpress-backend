@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { UpdateSetupDto } from '../dto/update-setup.dto';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
@@ -11,7 +10,8 @@ const execAsync = promisify(exec);
 
 @Injectable()
 export class SetupService {
-  constructor(private readonly setupRepository: SetupRepository) {}
+  constructor(private readonly setupRepository: SetupRepository
+  ) {}
   private usedPorts: Set<number> = new Set();
   private portRange = { min: 4000, max: 8000 };
   private getAvailablePort(): number {
@@ -23,6 +23,7 @@ export class SetupService {
     }
     throw new Error('No available ports in the specified range.');
   }
+
   async setupWordpress(
     config: CreateSetupDto,
     instanceId: string,
@@ -154,6 +155,13 @@ volumes:
       await execAsync(
         `docker exec ${wordpressContainerName} chown -R www-data:www-data /var/www/html`,
       );
+
+      const wpInfoCmd = `docker exec ${wordpressContainerName} wp --info --json --allow-root`;
+      const { stdout: wpInfoJson } = await execAsync(wpInfoCmd);
+      const wpInfo = JSON.parse(wpInfoJson);
+      console.log(wpInfo.php_version , 'info')
+      //await this.setupRepository.saveWpInfo(id, wpInfo);
+
       await this.setupRepository.SaveUserWordpress(
         config,
         wordpressContainerName,
@@ -167,6 +175,22 @@ volumes:
         error,
       );
       throw new Error(`WordPress setup failed for instance ${instanceId}`);
+    }
+  }
+
+  async deleteContainerAndVolumes(containerName: string): Promise<string> {
+    try {
+      const containerCheck = await execAsync(`docker ps -a --filter "name=${containerName}" --format "{{.Names}}"`);
+      if (!containerCheck.stdout.trim()) {
+        throw new NotFoundException(`Container '${containerName}' does not exist.`);
+      }
+      await execAsync(`docker stop ${containerName}`)
+
+      await execAsync(`docker rm --volumes ${containerName}`);
+
+      return `Container '${containerName}' and its associated volumes have been successfully deleted.`;
+    } catch (error) {
+      throw new Error(`Failed to delete container '${containerName}' and its volumes: ${error.message}`);
     }
   }
 
