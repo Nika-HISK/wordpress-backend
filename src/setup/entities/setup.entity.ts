@@ -1,6 +1,8 @@
 import { baseEntity } from 'src/base/entities/base.entity';
 import { User } from 'src/user/entities/user.entity';
 import { wpPlugin } from 'src/wpcli/entities/wpPlugin.entity';
+import { wpTheme } from 'src/wpcli/entities/wpTheme.entity';
+import { WpUser } from 'src/wpcli/entities/wpUser.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity()
@@ -34,5 +36,14 @@ export class Setup extends baseEntity {
   user: User;
 
   @OneToMany(() => wpPlugin, (wpPlugin) => wpPlugin.setup)
+  @JoinColumn({ name: 'setupId' }) 
   wpPlugins: wpPlugin[];
+
+  @OneToMany(() => wpTheme, (wpTheme) => wpTheme.setup)
+  @JoinColumn({ name: 'setupId' }) 
+  wpThemes: wpTheme[];
+
+  @OneToMany(() => WpUser, (wpUser) => wpUser.setup)
+  @JoinColumn({ name: 'setupId' }) 
+  wpUsers: WpUser[];
 }

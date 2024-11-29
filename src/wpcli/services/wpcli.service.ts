@@ -10,6 +10,9 @@ import { Setup } from 'src/setup/entities/setup.entity';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import shellEscape from 'shell-escape';
+import { WpPluginRepository } from '../repositories/wpPlugin.repository';
+import { WpThemeRepository } from '../repositories/wpTheme.repository';
+import { WpUserRepository } from '../repositories/wpUser.repository';
 
 const execAsync = promisify(exec);
 
@@ -18,6 +21,9 @@ export class wpcliService {
   constructor(
     @InjectRepository(Setup)
     private readonly setupRepository: Repository<Setup>,
+    private readonly wpPluginRepository:WpPluginRepository,
+    private readonly wpThemeRepository:WpThemeRepository,
+    private readonly wpUserRepository:WpUserRepository
     
   ) {}
 
@@ -93,6 +99,8 @@ export class wpcliService {
     const output = await this.execWpCli(setupId,userId, command);
     const themes = JSON.parse(output);
   
+    await this.wpThemeRepository.saveUserThemes(themes, setupId)
+
     if (search) {
       return themes.filter(theme =>
         theme.name?.toLowerCase().includes(search.toLowerCase())
@@ -127,6 +135,8 @@ export class wpcliService {
     const command = 'plugin list --status=active,inactive --format=json';
     const output = await this.execWpCli(setupId,userId, command);
     const plugins = JSON.parse(output);
+
+    await this.wpPluginRepository.saveUserPlugins(plugins, setupId)
   
     if (search) {
       return plugins.filter(plugin =>
@@ -178,6 +188,8 @@ export class wpcliService {
     const command = 'user list --format=json --fields=ID,first_name,last_name,user_email,roles';
     const output = await this.execWpCli(setupId,userId, command);
     const wpUsers = JSON.parse(output);
+
+    await this.wpUserRepository.saveWpUsers(wpUsers, setupId) // eroorrr 
   
     if (search) {
       return wpUsers.filter(user =>

@@ -34,9 +34,9 @@ export class UserController {
     return this.userService.updatePassword(Number(id),currentPassword ,newPassword);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.USER)
   @Get(':id')
-  async findOne(@Param('id') id: string,  @Body() newPassword: string) {
+  async findOne(@Param('id') id: string) {
     return await this.userService.findOne(+id);
   }
 
