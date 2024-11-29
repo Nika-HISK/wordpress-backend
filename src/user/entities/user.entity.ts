@@ -28,10 +28,16 @@ export class User extends baseEntity {
   @Column({default:false})
   banned:boolean 
   
-  @OneToMany(() => Setup, (setup) => setup.user)
+  @OneToMany(() => Setup, (setup) => setup.user, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
   setup: Setup[];
 
+  @OneToMany(() => FileEntity, (file) => file.user, {
+    cascade: true,
+    onDelete: 'CASCADE',
+  })
+  files: FileEntity[];
 
-  @OneToMany(() => FileEntity, (files) => files.user)
-  files:FileEntity[]
 }

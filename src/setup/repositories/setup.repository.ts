@@ -11,7 +11,7 @@ export class SetupRepository {
     private readonly setupRepository: Repository<Setup>,
   ) {}
 
-  async SaveUserWordpress(createSetupDto:CreateSetupDto,wordpressContainerName:string,instancePort:number,id:number ){
+  async SaveUserWordpress(createSetupDto:CreateSetupDto,wordpressContainerName:string,instancePort:number,id:number,phpVersion:string ){
     const newSetup = new Setup();
     newSetup.wpAdminUser = createSetupDto.wpAdminUser
     newSetup.wpAdminEmail = createSetupDto.wpAdminEmail
@@ -20,9 +20,15 @@ export class SetupRepository {
     newSetup.instancePort = instancePort
     newSetup.containerName = wordpressContainerName
     newSetup.userId = id
+    newSetup.phpVersion = phpVersion
     this.setupRepository.save(newSetup);
     
   } 
+
+  async findByPort(port: number): Promise<Setup | null> {
+    return await this.setupRepository.findOneBy({ instancePort: port });
+  }
+  
 
   async deleteUser(id:number) {
     return await this.setupRepository.softDelete(id)

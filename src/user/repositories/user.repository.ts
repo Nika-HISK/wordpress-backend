@@ -16,6 +16,24 @@ export class UserRepository {
         private readonly userRepository:Repository<User>
     ) {}
 
+    async me(userId: number) {
+      return await this.userRepository.createQueryBuilder('user')
+      .leftJoinAndSelect('user.setup', 'setup')
+      .where('user.id = :userId', { userId })
+      .select([
+        'user.id',
+        'user.firstName',
+        'user.lastName',
+        'user.email',
+        'setup.id',
+        'setup.containerName',
+        'setup.phpVersion',
+        'setup.instancePort',
+        'setup.siteTitle',
+      ])
+      .getOne();
+    }
+  
 
     async create(createUserDto: CreateUserDto) {
         let hashedPassword = await bcrypt.hash(createUserDto.password, 10);

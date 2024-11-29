@@ -14,9 +14,10 @@ export class SetupService {
   ) {}
   private usedPorts: Set<number> = new Set();
   private portRange = { min: 4000, max: 8000 };
-  private getAvailablePort(): number {
+  private async getAvailablePort(): Promise<number> {
     for (let port = this.portRange.min; port <= this.portRange.max; port++) {
-      if (!this.usedPorts.has(port)) {
+      const portInUse = await this.setupRepository.findByPort(port);
+      if (!portInUse) {
         this.usedPorts.add(port);
         return port;
       }
@@ -30,7 +31,7 @@ export class SetupService {
     id: number,
   ): Promise<string> {
     const { wpAdminUser, wpAdminPassword, wpAdminEmail, siteTitle } = config;
-    const instancePort = this.getAvailablePort();
+    const instancePort = await this.getAvailablePort();
     try {
       console.log(`Starting WordPress setup for instance ${instanceId}...`);
       const dockerComposeYml = `
@@ -159,14 +160,14 @@ volumes:
       const wpInfoCmd = `docker exec ${wordpressContainerName} wp --info --json --allow-root`;
       const { stdout: wpInfoJson } = await execAsync(wpInfoCmd);
       const wpInfo = JSON.parse(wpInfoJson);
-      console.log(wpInfo.php_version , 'info')
-      //await this.setupRepository.saveWpInfo(id, wpInfo);
+      const phpVersion = wpInfo.php_version
 
       await this.setupRepository.SaveUserWordpress(
         config,
         wordpressContainerName,
         instancePort,
         id,
+        phpVersion
       );
       return `WordPress setup complete for instance ${instanceId} on port ${instancePort}!`;
     } catch (error) {
