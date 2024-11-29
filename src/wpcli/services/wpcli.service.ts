@@ -18,6 +18,7 @@ export class wpcliService {
   constructor(
     @InjectRepository(Setup)
     private readonly setupRepository: Repository<Setup>,
+    
   ) {}
 
 
@@ -132,7 +133,6 @@ export class wpcliService {
         plugin.name?.toLowerCase().includes(search.toLowerCase())
       );
     }
-  
     return plugins;
   }
   async wpPluginActivate(setupId:number,userId: number, plugin: string): Promise<string> {

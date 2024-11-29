@@ -5,11 +5,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Setup } from './entities/setup.entity';
 import { SetupRepository } from './repositories/setup.repository';
 import { UserModule } from 'src/user/user.module'; 
+import { wpPlugin } from 'src/wpcli/entities/wpPlugin.entity';
 
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Setup]),
+    TypeOrmModule.forFeature([Setup,wpPlugin]),
     UserModule,
   ],
   controllers: [SetupController],
