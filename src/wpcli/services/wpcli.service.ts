@@ -10,7 +10,6 @@ import { Setup } from 'src/setup/entities/setup.entity';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import shellEscape from 'shell-escape';
-import { wpPlugin } from '../entities/plugin.entity';
 
 const execAsync = promisify(exec);
 
@@ -19,7 +18,6 @@ export class wpcliService {
   constructor(
     @InjectRepository(Setup)
     private readonly setupRepository: Repository<Setup>,
-    private readonly plugin:UserRepository
   ) {}
 
 
@@ -99,7 +97,6 @@ export class wpcliService {
         theme.name?.toLowerCase().includes(search.toLowerCase())
       );
     }
-    await this.themeRepository.saveThemes(themes, setupId, userId);
     return themes;
   }
 
@@ -135,7 +132,6 @@ export class wpcliService {
         plugin.name?.toLowerCase().includes(search.toLowerCase())
       );
     }
-    await this.PluginRepository.savePlugins(plugins, setupId, userId);
   
     return plugins;
   }
@@ -189,8 +185,6 @@ export class wpcliService {
         user.last_name?.toLowerCase().includes(search.toLowerCase())
       );
     }
-    
-  await this.wpUserRepository.saveUsers(wpUsers, setupId, userId);
     return wpUsers;
   }
   
