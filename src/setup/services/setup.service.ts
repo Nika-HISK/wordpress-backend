@@ -179,19 +179,58 @@ volumes:
     }
   }
 
-  async deleteContainerAndVolumes(containerName: string): Promise<string> {
+  async deleteSetupById(setupId: number): Promise<string> {
+    // Fetch the setup by ID
+    const setup = await this.setupRepository.findOne(setupId);
+    if (!setup) {
+      throw new NotFoundException(`Setup with ID ${setupId} not found.`);
+    }
+  
+    const containerName = setup.containerName; // WordPress container name
+    const dbContainerName = `${containerName}-db`; // Assuming a naming convention
+  
     try {
-      const containerCheck = await execAsync(`docker ps -a --filter "name=${containerName}" --format "{{.Names}}"`);
-      if (!containerCheck.stdout.trim()) {
-        throw new NotFoundException(`Container '${containerName}' does not exist.`);
-      }
-      await execAsync(`docker stop ${containerName}`)
-
-      await execAsync(`docker rm --volumes ${containerName}`);
-
-      return `Container '${containerName}' and its associated volumes have been successfully deleted.`;
+      // Delete the WordPress container
+      await this.deleteContainerWithVolumes(containerName);
+  
+      // Delete the associated SQL container
+      await this.deleteContainerWithVolumes(dbContainerName);
+  
+      // Soft delete the setup from the database
+      await this.setupRepository.deleteSetup(setupId);
+      console.log(`Soft deleted setup entry with ID ${setupId} from the database.`);
+  
+      return `Both '${containerName}' and its associated database container '${dbContainerName}' have been successfully deleted.`;
     } catch (error) {
-      throw new Error(`Failed to delete container '${containerName}' and its volumes: ${error.message}`);
+      throw new Error(
+        `Failed to delete containers and setup: ${error.message}`
+      );
+    }
+  }
+  
+  // Helper method to delete a container and its volumes
+  private async deleteContainerWithVolumes(containerName: string): Promise<void> {
+    try {
+      // Check if the container exists
+      const containerCheck = await execAsync(
+        `docker ps -a --filter "name=${containerName}" --format "{{.Names}}"`
+      );
+  
+      if (!containerCheck.stdout.trim()) {
+        console.log(`Container '${containerName}' does not exist.`);
+        return;
+      }
+  
+      // Stop the container
+      await execAsync(`docker stop ${containerName}`);
+      console.log(`Stopped container '${containerName}'.`);
+  
+      // Remove the container and its volumes
+      await execAsync(`docker rm --volumes ${containerName}`);
+      console.log(`Deleted container '${containerName}' and its volumes.`);
+    } catch (error) {
+      console.error(`Error deleting container '${containerName}': ${error.message}`);
+      throw error;
     }
   }
 
