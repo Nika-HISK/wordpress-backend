@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { UpdateSetupDto } from '../dto/update-setup.dto';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
@@ -11,25 +10,28 @@ const execAsync = promisify(exec);
 
 @Injectable()
 export class SetupService {
-  constructor(private readonly setupRepository: SetupRepository) {}
+  constructor(private readonly setupRepository: SetupRepository
+  ) {}
   private usedPorts: Set<number> = new Set();
   private portRange = { min: 4000, max: 8000 };
-  private getAvailablePort(): number {
+  private async getAvailablePort(): Promise<number> {
     for (let port = this.portRange.min; port <= this.portRange.max; port++) {
-      if (!this.usedPorts.has(port)) {
+      const portInUse = await this.setupRepository.findByPort(port);
+      if (!portInUse) {
         this.usedPorts.add(port);
         return port;
       }
     }
     throw new Error('No available ports in the specified range.');
   }
+
   async setupWordpress(
     config: CreateSetupDto,
     instanceId: string,
     id: number,
   ): Promise<string> {
     const { wpAdminUser, wpAdminPassword, wpAdminEmail, siteTitle } = config;
-    const instancePort = this.getAvailablePort();
+    const instancePort = await this.getAvailablePort();
     try {
       console.log(`Starting WordPress setup for instance ${instanceId}...`);
       const dockerComposeYml = `
@@ -154,11 +156,18 @@ volumes:
       await execAsync(
         `docker exec ${wordpressContainerName} chown -R www-data:www-data /var/www/html`,
       );
+
+      const wpInfoCmd = `docker exec ${wordpressContainerName} wp --info --json --allow-root`;
+      const { stdout: wpInfoJson } = await execAsync(wpInfoCmd);
+      const wpInfo = JSON.parse(wpInfoJson);
+      const phpVersion = wpInfo.php_version
+
       await this.setupRepository.SaveUserWordpress(
         config,
         wordpressContainerName,
         instancePort,
         id,
+        phpVersion
       );
       return `WordPress setup complete for instance ${instanceId} on port ${instancePort}!`;
     } catch (error) {
@@ -167,6 +176,61 @@ volumes:
         error,
       );
       throw new Error(`WordPress setup failed for instance ${instanceId}`);
+    }
+  }
+
+  async deleteSetupById(setupId: number): Promise<string> {
+    // Fetch the setup by ID
+    const setup = await this.setupRepository.findOne(setupId);
+    if (!setup) {
+      throw new NotFoundException(`Setup with ID ${setupId} not found.`);
+    }
+  
+    const containerName = setup.containerName; // WordPress container name
+    const dbContainerName = `${containerName}-db`; // Assuming a naming convention
+  
+    try {
+      // Delete the WordPress container
+      await this.deleteContainerWithVolumes(containerName);
+  
+      // Delete the associated SQL container
+      await this.deleteContainerWithVolumes(dbContainerName);
+  
+      // Soft delete the setup from the database
+      await this.setupRepository.deleteSetup(setupId);
+      console.log(`Soft deleted setup entry with ID ${setupId} from the database.`);
+  
+      return `Both '${containerName}' and its associated database container '${dbContainerName}' have been successfully deleted.`;
+    } catch (error) {
+      throw new Error(
+        `Failed to delete containers and setup: ${error.message}`
+      );
+    }
+  }
+  
+  // Helper method to delete a container and its volumes
+  private async deleteContainerWithVolumes(containerName: string): Promise<void> {
+    try {
+      // Check if the container exists
+      const containerCheck = await execAsync(
+        `docker ps -a --filter "name=${containerName}" --format "{{.Names}}"`
+      );
+  
+      if (!containerCheck.stdout.trim()) {
+        console.log(`Container '${containerName}' does not exist.`);
+        return;
+      }
+  
+      // Stop the container
+      await execAsync(`docker stop ${containerName}`);
+      console.log(`Stopped container '${containerName}'.`);
+  
+      // Remove the container and its volumes
+      await execAsync(`docker rm --volumes ${containerName}`);
+      console.log(`Deleted container '${containerName}' and its volumes.`);
+    } catch (error) {
+      console.error(`Error deleting container '${containerName}': ${error.message}`);
+      throw error;
     }
   }
 

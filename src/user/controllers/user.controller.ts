@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
 import { UserService } from '../services/user.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
@@ -10,6 +10,12 @@ import { Role } from 'src/auth/guard/enum/role.enum';
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService, private readonly userRepository:UserRepository) {}
+
+  @Roles(Role.USER, Role.ADMIN)
+  @Get('me')
+  async me(@Req() req: any) {
+    return await this.userService.me(req.user.id)
+  }
 
   @Post()
   async create(@Body() createUserDto: CreateUserDto) {

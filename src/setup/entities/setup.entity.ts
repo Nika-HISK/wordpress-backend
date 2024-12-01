@@ -1,6 +1,7 @@
 import { baseEntity } from 'src/base/entities/base.entity';
 import { User } from 'src/user/entities/user.entity';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { wpPlugin } from 'src/wpcli/entities/wpPlugin.entity';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity()
 export class Setup extends baseEntity {
@@ -20,6 +21,9 @@ export class Setup extends baseEntity {
   containerName: string;
 
   @Column()
+  phpVersion:string
+
+  @Column()
   instancePort:number
 
   @Column()
@@ -29,4 +33,6 @@ export class Setup extends baseEntity {
   @JoinColumn({ name: 'userId' }) 
   user: User;
 
+  @OneToMany(() => wpPlugin, (wpPlugin) => wpPlugin.setup)
+  wpPlugins: wpPlugin[];
 }

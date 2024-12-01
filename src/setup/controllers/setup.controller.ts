@@ -9,6 +9,7 @@ import {
   HttpStatus,
   Req,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupService } from '../services/setup.service';
@@ -82,5 +83,10 @@ export class SetupController {
   @Get('wordpress/username')
   async findByusername(){
     return await this.setupService.findByusername()
+  }
+  @Roles(Role.USER)
+  @Delete('wordpress')
+  async deleteSetup(@Query('setupId') setupId: number): Promise<string> {
+    return this.setupService.deleteSetupById(setupId);
   }
 }

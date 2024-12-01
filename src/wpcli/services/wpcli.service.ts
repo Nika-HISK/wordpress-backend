@@ -18,27 +18,35 @@ export class wpcliService {
   constructor(
     @InjectRepository(Setup)
     private readonly setupRepository: Repository<Setup>,
+    
   ) {}
 
-  // Fetch the container name based on user ID
-  private async getContainerName(userId: number): Promise<string> {
+
+  private async getContainerName(
+    setupId: number,
+    userId: number,
+  ): Promise<string> {
     const setup = await this.setupRepository.findOne({
-      where: { userId },
+      where: { id: setupId, userId },
       select: ['containerName'],
     });
 
     if (!setup) {
       throw new NotFoundException(
-        `No WordPress setup found for user ID ${userId}`,
+        `No WordPress setup found for setup ID ${setupId} and user ID ${userId}`,
       );
     }
 
     return setup.containerName;
   }
 
-  // Execute WP-CLI commands in the user's Docker container
-  private async execWpCli(userId: number, command: string): Promise<string> {
-    const containerName = await this.getContainerName(userId);
+
+  private async execWpCli(
+    setupId: number,
+    userId: number,
+    command: string,
+  ): Promise<string> {
+    const containerName = await this.getContainerName(setupId, userId);
 
     try {
       const { stdout, stderr } = await execAsync(
@@ -54,38 +62,35 @@ export class wpcliService {
     }
   }
 
-  async wpGetMaintenanceStatus(userId: number): Promise<string> {
-    return this.execWpCli(userId, `maintenance-mode status`);
+  async wpGetMaintenanceStatus(setupId:number,userId: number): Promise<string> {
+    return this.execWpCli(setupId,userId, `maintenance-mode status`);
+    
   }
 
   async wpMaintenance(
+    setupId:number,
     userId: number,
     mode: 'enable' | 'disable',
   ): Promise<string> {
     const subCommand = mode === 'enable' ? 'activate' : 'deactivate';
-    return this.execWpCli(userId, `maintenance-mode ${subCommand}`);
+    return this.execWpCli(setupId,userId, `maintenance-mode ${subCommand}`);
   }
 
   async wpCacheAdd(
+    setupId:number,
     userId: number,
     key: string,
     data: string,
     group: string,
   ): Promise<string> {
-    return this.execWpCli(userId, `cache add ${key} "${data}" ${group}`);
+    return this.execWpCli(setupId,userId, `cache add ${key} "${data}" ${group}`);
   }
 
-  async wpPlugin(
-    userId: number,
-    subCommand: string,
-    args: string,
-  ): Promise<string> {
-    return this.execWpCli(userId, `plugin ${subCommand} ${args}`);
-  }
 
-  async wpThemeList(userId: number, search?: string): Promise<any> {
+
+  async wpThemeList(setupId:number,userId: number, search?: string): Promise<any> {
     const command = `theme list --format=json`;
-    const output = await this.execWpCli(userId, command);
+    const output = await this.execWpCli(setupId,userId, command);
     const themes = JSON.parse(output);
   
     if (search) {
@@ -93,33 +98,34 @@ export class wpcliService {
         theme.name?.toLowerCase().includes(search.toLowerCase())
       );
     }
-  
     return themes;
   }
 
-  async wpThemeActivate(userId: number, theme: string): Promise<string> {
+  async wpThemeActivate(setupId:number,userId: number, theme: string): Promise<string> {
     if (!theme) {
       throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);
     }
-    return this.execWpCli(userId, `theme activate ${theme}`);
+    return this.execWpCli(setupId,userId, `theme activate ${theme}`);
   }
 
-  async wpThemeDelete(userId: number, theme: string): Promise<string> {
+  async wpThemeDelete(setupId:number,userId: number, theme: string): Promise<string> {
     if (!theme) {
       throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);
     }
-    return this.execWpCli(userId, `theme delete ${theme}`);
+    return this.execWpCli(setupId,userId, `theme delete ${theme}`);
   }
 
-  async wpThemeUpdate(userId: number, theme: string): Promise<string> {
+  async wpThemeUpdate(setupId:number,userId: number, theme: string): Promise<string> {
     if (!theme) {
       throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);
     }
-    return this.execWpCli(userId, `theme update ${theme}`);
+    return this.execWpCli(setupId,userId, `theme update ${theme}`);
   }
-  async wpPluginList(userId: number, search?: string): Promise<any> {
+  async wpPluginList(setupId:number,userId: number, search?: string): Promise<any> {
+    console.log(setupId);
+    
     const command = 'plugin list --status=active,inactive --format=json';
-    const output = await this.execWpCli(userId, command);
+    const output = await this.execWpCli(setupId,userId, command);
     const plugins = JSON.parse(output);
   
     if (search) {
@@ -127,91 +133,91 @@ export class wpcliService {
         plugin.name?.toLowerCase().includes(search.toLowerCase())
       );
     }
-  
     return plugins;
   }
-  async wpPluginActivate(userId: number, plugin: string): Promise<string> {
+  async wpPluginActivate(setupId:number,userId: number, plugin: string): Promise<string> {
     if (!plugin) {
       throw new HttpException(
         'Plugin name is required',
         HttpStatus.BAD_REQUEST,
       );
     }
-    return this.execWpCli(userId, `plugin activate ${plugin}`);
+    return this.execWpCli(setupId,userId, `plugin activate ${plugin}`);
   }
 
-  async wpPluginDeactivate(userId: number, plugin: string): Promise<string> {
+  async wpPluginDeactivate(setupId:number,userId: number, plugin: string): Promise<string> {
     if (!plugin) {
       throw new HttpException(
         'Plugin name is required',
         HttpStatus.BAD_REQUEST,
       );
     }
-    return this.execWpCli(userId, `plugin deactivate ${plugin}`);
+    return this.execWpCli(setupId,userId, `plugin deactivate ${plugin}`);
   }
 
-  async wpPluginDelete(userId: number, plugin: string): Promise<string> {
+  async wpPluginDelete(setupId:number,userId: number, plugin: string): Promise<string> {
     if (!plugin) {
       throw new HttpException(
         'Plugin name is required',
         HttpStatus.BAD_REQUEST,
       );
     }
-    return this.execWpCli(userId, `plugin delete ${plugin}`);
+    return this.execWpCli(setupId,userId, `plugin delete ${plugin}`);
   }
 
-  async wpPluginUpdate(userId: number, plugin: string): Promise<string> {
+  async wpPluginUpdate(setupId:number,userId: number, plugin: string): Promise<string> {
     if (!plugin) {
       throw new HttpException(
         'Plugin name is required',
         HttpStatus.BAD_REQUEST,
       );
     }
-    return this.execWpCli(userId, `plugin update ${plugin}`);
+    return this.execWpCli(setupId,userId, `plugin update ${plugin}`);
   }
-  async wpUserList(userId: number, search?: string): Promise<any> {
+  async wpUserList(setupId:number,userId: number, search?: string): Promise<any> {
     const command = 'user list --format=json --fields=ID,first_name,last_name,user_email,roles';
-    const output = await this.execWpCli(userId, command);
-    const users = JSON.parse(output);
+    const output = await this.execWpCli(setupId,userId, command);
+    const wpUsers = JSON.parse(output);
   
     if (search) {
-      return users.filter(user =>
+      return wpUsers.filter(user =>
         user.first_name?.toLowerCase().includes(search.toLowerCase()) ||
         user.last_name?.toLowerCase().includes(search.toLowerCase())
       );
     }
-  
-    return users;
+    return wpUsers;
   }
   
-  async wpUserDelete(userId: number, targetUserId: number): Promise<string> {
-    await this.execWpCli(userId, `user delete ${targetUserId} --yes`);
+  async wpUserDelete(setupId:number,userId: number, targetUserId: number): Promise<string> {
+    await this.execWpCli(setupId,userId, `user delete ${targetUserId} --yes`);
     return `User with ID ${targetUserId} has been deleted from WordPress`;
   }
 
   async wpUserRoleUpdate(
+    setupId:number,
     userId: number,
     targetUserId: number,
     role: string,
   ): Promise<string> {
-    const user = await this.execWpCli(userId, `user get ${targetUserId}`);
+    const user = await this.execWpCli(setupId,userId, `user get ${targetUserId}`);
     if (!user) {
       throw new NotFoundException(
         `User with ID ${targetUserId} not found in WordPress`,
       );
     }
 
-    await this.execWpCli(userId, `user update ${targetUserId} --role=${role}`);
+    await this.execWpCli(setupId,userId, `user update ${targetUserId} --role=${role}`);
     return `User with ID ${targetUserId} role has been updated to ${role}`;
   }
 
   async wpSearchReplace(
+    setupId:number,
     userId: number,
     search: string,
     replace: string,
     options: Record<string, any> = {},
   ): Promise<string> {
-    const containerName = await this.getContainerName(userId);
+    const containerName = await this.getContainerName(setupId,userId);
 
     const args: string[] = ['search-replace', search, replace];
 
@@ -247,8 +253,8 @@ export class wpcliService {
     }
   }
 
-  async wpCoreCheckUpdate(userId: number): Promise<any> {
-    const output = await this.execWpCli(userId, 'core check-update --format=json');
+  async wpCoreCheckUpdate(setupId:number,userId: number): Promise<any> {
+    const output = await this.execWpCli(setupId,userId, 'core check-update --format=json');
     const updates = JSON.parse(output);
   
     if (updates.length === 0) {
@@ -257,22 +263,32 @@ export class wpcliService {
   
     return updates;
   }
-  async wpDbSize(userId: number): Promise<any> {
-    const output = await this.execWpCli(
+  async wpDbSize(setupId:number,userId: number): Promise<any> {
+    const output = await this.execWpCli(setupId,
       userId,
       'db size --format=json',
     );
     return JSON.parse(output);
   }
 
-  async wpRoleList(userId: number): Promise<any> {
-    const output = await this.execWpCli(userId, 'role list --format=json');
+  async wpRoleList(setupId:number,userId: number): Promise<any> {
+    const output = await this.execWpCli(setupId,userId, 'role list --format=json');
     return JSON.parse(output);
   }
 
-  async wpCoreVersion(userId: number): Promise<object> {
-    const output = await this.execWpCli(userId, 'core version');
+  async wpCoreVersion(setupId:number,userId: number): Promise<object> {
+    const output = await this.execWpCli(setupId,userId, 'core version');
     const version = {version:output}
     return version
+  }
+
+  async wpGetPhpVersion(setupId:number,userId: number): Promise<object> {
+    const output = await this.execWpCli(setupId,userId, '--info --format=json');
+    const info = JSON.parse(output);
+    if (!info.php_version) {
+      throw new Error('PHP version information not found in WP-CLI output.');
+    }
+    const phpVerion = {phpVersion:info.php_version}
+    return phpVerion;
   }
 }

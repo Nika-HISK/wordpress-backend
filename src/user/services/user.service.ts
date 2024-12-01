@@ -8,6 +8,10 @@ export class UserService {
 
   constructor(private readonly userRepository:UserRepository) {}
 
+  async me(userId: number) {
+    return await this.userRepository.me(userId)
+  }
+
   async create(createUserDto: CreateUserDto) {
     return await this.userRepository.create(createUserDto);
   }
