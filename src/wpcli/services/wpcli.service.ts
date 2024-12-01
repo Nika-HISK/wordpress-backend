@@ -281,7 +281,7 @@ export class wpcliService {
   
     return updates;
   }
-  async wpDbSize(setupId:number,userId: number): Promise<any> {
+  async wpDbName(setupId:number,userId: number): Promise<any> {
     const output = await this.execWpCli(setupId,
       userId,
       'db size --format=json',

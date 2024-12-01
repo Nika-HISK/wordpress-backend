@@ -16,6 +16,7 @@ import { SetupService } from '../services/setup.service';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
 import { Throttle } from '@nestjs/throttler';
+import { ExtendedRequest } from 'src/auth/dto/extended-request.interface';
 
 
 // @UseGuards(AuthGuard)
@@ -26,7 +27,8 @@ export class SetupController {
   @Throttle({ default: { limit: 1, ttl: 2000 } })
   @Roles(Role.USER)
   @Post('wordpress')
-  async setupWordpress(@Body() body: CreateSetupDto, @Req() req: any) {
+  async setupWordpress(@Body() body: CreateSetupDto, @Req() req: ExtendedRequest) {
+    const userId = req.user.id
     
     try {      
       
@@ -39,7 +41,7 @@ export class SetupController {
         await this.setupService.setupWordpress(
         body,
         instanceId,
-       req.user.id
+        userId
       );
      
     } catch (error) {
