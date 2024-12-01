@@ -27,4 +27,7 @@ auto_update:string
 @JoinColumn({ name: 'setupId' })
 setup: Setup;
 
+@Column()
+setupId:number
+
 }

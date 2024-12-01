@@ -117,6 +117,9 @@ export class wpcliService {
   }
 
   async wpThemeDelete(setupId:number,userId: number, theme: string): Promise<string> {
+
+    await this.wpThemeRepository.deleteThemes(theme)
+
     if (!theme) {
       throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);
     }
@@ -166,6 +169,8 @@ export class wpcliService {
   }
 
   async wpPluginDelete(setupId:number,userId: number, plugin: string): Promise<string> {
+    await this.wpPluginRepository.deletePlugins(plugin)
+    
     if (!plugin) {
       throw new HttpException(
         'Plugin name is required',
@@ -189,7 +194,7 @@ export class wpcliService {
     const output = await this.execWpCli(setupId,userId, command);
     const wpUsers = JSON.parse(output);
 
-    await this.wpUserRepository.saveWpUsers(wpUsers, setupId) // eroorrr 
+    await this.wpUserRepository.saveWpUsers(wpUsers, setupId)
   
     if (search) {
       return wpUsers.filter(user =>
@@ -201,6 +206,7 @@ export class wpcliService {
   }
   
   async wpUserDelete(setupId:number,userId: number, targetUserId: number): Promise<string> {
+    await this.wpUserRepository.deleteWpUsers(targetUserId)
     await this.execWpCli(setupId,userId, `user delete ${targetUserId} --yes`);
     return `User with ID ${targetUserId} has been deleted from WordPress`;
   }
