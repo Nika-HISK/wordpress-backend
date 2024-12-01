@@ -23,8 +23,12 @@ update_version:string
 @Column()
 auto_update:string
 
+
 @ManyToOne(() => Setup, (setup) => setup.wpPlugins, { onDelete: 'CASCADE' })
 @JoinColumn({ name: 'setupId' })
 setup: Setup;
+
+@Column()
+setupId:number
 
 }

@@ -22,5 +22,8 @@ export class WpUser extends baseEntity {
     @JoinColumn({ name: 'setupId' })
     setup: Setup;
 
+    @Column()
+    setupId:number
+
 
 }
