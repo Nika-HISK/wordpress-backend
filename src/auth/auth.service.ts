@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { UserRepository } from 'src/user/repositories/user.repository';
 import { Role } from 'src/auth/guard/enum/role.enum'; 
 import { UserService } from 'src/user/services/user.service';
+import { LoginDto } from './dto/login-dto';
 
 @Injectable()
 export class AuthService {
@@ -30,7 +31,7 @@ export class AuthService {
     return this.userService.create(createUserDto);
   }
 
-  async login(createUserDto: CreateUserDto) {
+  async login(createUserDto: LoginDto) {
     const { email, password } = createUserDto;
     const user = await this.userService.findOneByEmail(email);
     const isPasswordCorrect = user && (await bcrypt.compare(password, user.password));

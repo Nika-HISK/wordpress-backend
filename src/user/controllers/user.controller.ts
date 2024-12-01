@@ -5,6 +5,7 @@ import { UpdateUserDto } from '../dto/update-user.dto';
 import { UserRepository } from '../repositories/user.repository';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
+import { ExtendedRequest } from 'src/auth/dto/extended-request.interface';
 
 
 @Controller('user')
@@ -13,8 +14,9 @@ export class UserController {
 
   @Roles(Role.USER, Role.ADMIN)
   @Get('me')
-  async me(@Req() req: any) {
-    return await this.userService.me(req.user.id)
+  async me(@Req() req: ExtendedRequest) {
+    const userId = req.user.id
+    return await this.userService.me(userId)
   }
 
   @Post()
