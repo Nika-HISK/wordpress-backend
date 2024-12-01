@@ -58,9 +58,14 @@ export class UserRepository {
         return this.userRepository.find()
       }
 
-      async findOne(id:number) {
-        return this.userRepository.findOneBy({id})
+      async findOne(id: number) {
+        return await this.userRepository
+          .createQueryBuilder('user')
+          .leftJoinAndSelect('user.setup', 'setup') 
+          .where('user.id = :id', { id })
+          .getOne();
       }
+      
 
       async findOneByEmail(email:string) {
         return await this.userRepository.findOneBy({email})
