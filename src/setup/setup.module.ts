@@ -10,6 +10,9 @@ import { WpPluginRepository } from 'src/wpcli/repositories/wpPlugin.repository';
 import { wpTheme } from 'src/wpcli/entities/wpTheme.entity';
 import { WpUser } from 'src/wpcli/entities/wpUser.entity';
 import { WpUserRepository } from 'src/wpcli/repositories/wpUser.repository';
+import { YmlService } from 'src/yml/services/yml.service';
+import { DockerService } from 'src/docker/services/docker.service';
+import { HelperService } from 'src/helper/services/helper.service';
 
 @Module({
   imports: [
@@ -17,7 +20,7 @@ import { WpUserRepository } from 'src/wpcli/repositories/wpUser.repository';
     UserModule,
   ],
   controllers: [SetupController],
-  providers: [SetupService, SetupRepository, WpPluginRepository, WpUserRepository],
+  providers: [SetupService, SetupRepository, WpPluginRepository, WpUserRepository, YmlService, DockerService, HelperService],
   exports: [SetupRepository, SetupService],
 })
 export class SetupModule {}
