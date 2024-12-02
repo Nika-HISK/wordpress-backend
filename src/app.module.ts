@@ -10,6 +10,9 @@ import { FilesModule } from './files/files.module';
 import { AwsModule } from './aws/aws.module';
 import { AuthModule } from './auth/auth.module';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { YmlModule } from './yml/yml.module';
+import { DockerModule } from './docker/docker.module';
+import { HelperModule } from './helper/helper.module';
 
 @Module({
   imports: [ThrottlerModule.forRoot([
@@ -46,6 +49,9 @@ import { ThrottlerModule } from '@nestjs/throttler';
     WpcliModule,
     FilesModule,
     AwsModule,
+    YmlModule,
+    DockerModule,
+    HelperModule,
   ],
   controllers: [AppController],
   providers: [AppService],
