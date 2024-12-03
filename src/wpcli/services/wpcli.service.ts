@@ -133,7 +133,6 @@ export class wpcliService {
     return this.execWpCli(setupId,userId, `theme update ${theme}`);
   }
   async wpPluginList(setupId:number,userId: number, search?: string): Promise<any> {
-    console.log(setupId);
     
     const command = 'plugin list --status=active,inactive --format=json';
     const output = await this.execWpCli(setupId,userId, command);
@@ -217,7 +216,7 @@ export class wpcliService {
     targetUserId: number,
     role: string,
   ): Promise<string> {
-    const user = await this.execWpCli(setupId,userId, `user get ${targetUserId}`);
+    const user = await this.execWpCli(setupId,userId, `user get ${targetUserId}`);   
     if (!user) {
       throw new NotFoundException(
         `User with ID ${targetUserId} not found in WordPress`,

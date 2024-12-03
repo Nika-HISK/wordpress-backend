@@ -13,6 +13,11 @@ async function bootstrap() {
       whitelist: true,
     }),
   );
+  app.enableCors({
+    origin: ['*'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+  });
   app.use(cookieParser());
   const config = new DocumentBuilder()
     .setTitle('WP CLI API')

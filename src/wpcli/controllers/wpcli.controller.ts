@@ -54,6 +54,8 @@ import {
   ApiWpUserList,
   ApiWpUserRoleUpdate,
 } from '../Decorators/wp-cli-swagger.decorator';
+import { WpUserRoleUpdate } from '../dtos/wp-userrole-update.dto';
+import { log } from 'console';
 
 @ApiTags('WP CLI')
 @ApiBearerAuth()
@@ -179,11 +181,13 @@ export class wpcliController {
   async wpThemeDelete(
     @Param() params: SetupIdDto,
     @Req() req: ExtendedRequest,
-    @Query() query: WpThemeDeleteDto,
+    @Body() body: WpThemeDeleteDto,
   ) {
     const userId = req.user.id;
     const { setupId } = params;
-    const { theme } = query;
+    const theme = body.theme
+    console.log(theme);
+    
     return this.wpCliService.wpThemeDelete(setupId, userId, theme);
   }
 
@@ -249,11 +253,12 @@ export class wpcliController {
   async wpPluginDelete(
     @Param() params: SetupIdDto,
     @Req() req: ExtendedRequest,
-    @Query() query: WpPluginDeleteDto,
+    @Body() query: WpPluginDeleteDto,
   ) {
+    
     const userId = req.user.id;
     const { setupId } = params;
-    const { plugin } = query;
+    const { plugin } = query; 
     return this.wpCliService.wpPluginDelete(setupId, userId, plugin);
   }
 
@@ -268,6 +273,7 @@ export class wpcliController {
     const userId = req.user.id;
     const { setupId } = params;
     const { plugin } = query;
+    
     return this.wpCliService.wpPluginUpdate(setupId, userId, plugin);
   }
 
@@ -301,13 +307,15 @@ export class wpcliController {
 
   @Roles(Role.USER)
   @ApiWpUserRoleUpdate()
-  @Put('wprole/:setupId')
+  @Put('wprole/:setupId/:WpUserId')
   async wpUserRoleUpdate(
     @Param() params: SetupIdDto,
     @Req() req: ExtendedRequest,
     @Param() param: WpUserIdDto,
-    @Query() role: string,
+    @Query() wpRole: WpUserRoleUpdate,
   ) {
+    
+    const {role} = wpRole
     const userId = req.user.id;
     const { setupId } = params;
     const { WpUserId } = param;
