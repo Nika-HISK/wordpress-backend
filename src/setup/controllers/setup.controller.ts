@@ -63,9 +63,9 @@ export class SetupController {
   }
 
   @Roles(Role.USER)
-  @Delete('/wordpress:id')
+  @Delete('/wordpress/:id')
   async remove(@Param('id') id: string) {
-    return await this.setupService.deleteWorpress(Number(id));
+    return await this.setupService.deleteWordpress(Number(id));
   }
 
 

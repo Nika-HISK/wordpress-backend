@@ -11,16 +11,17 @@ export class SetupRepository {
     private readonly setupRepository: Repository<Setup>,
   ) {}
 
-  async SaveUserWordpress(createSetupDto:CreateSetupDto,wordpressContainerName:string,instancePort:number,id:number,phpVersion:string ){
+  async SaveUserWordpress(createSetupDto:CreateSetupDto,wordpressContainerName:string,instancePort:number,id:number,phpVersion:string, dbContainerName:string){
     const newSetup = new Setup();
     newSetup.wpAdminUser = createSetupDto.wpAdminUser
     newSetup.wpAdminEmail = createSetupDto.wpAdminEmail
     newSetup.wpAdminPassword = createSetupDto.wpAdminPassword
     newSetup.siteTitle = createSetupDto.siteTitle
     newSetup.instancePort = instancePort
-    newSetup.containerName = wordpressContainerName
+    newSetup.wordpressContainerName = wordpressContainerName
     newSetup.userId = id
     newSetup.phpVersion = phpVersion
+    newSetup.dbContainerName = dbContainerName
     this.setupRepository.save(newSetup);
     
   } 
