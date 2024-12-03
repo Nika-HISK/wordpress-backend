@@ -20,7 +20,10 @@ export class Setup extends baseEntity {
   siteTitle: string;
 
   @Column({unique:true})
-  containerName: string;
+  wordpressContainerName: string;
+
+  @Column({unique:true})
+  dbContainerName:string
 
   @Column()
   phpVersion:string
