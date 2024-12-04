@@ -23,6 +23,8 @@ import { Throttle } from '@nestjs/throttler';
 export class SetupController {
   constructor(private readonly setupService: SetupService) {}
 
+  
+
   @Throttle({ default: { limit: 1, ttl: 2000 } })
   @Roles(Role.USER)
   @Post('wordpress')
@@ -36,10 +38,13 @@ export class SetupController {
         return `${randomPart}-${timestampPart}`;
       };
       const instanceId = generateInstanceId();
-        await this.setupService.setupWordpress(
-        body,
-        instanceId,
-       req.user.id
+        await this.setupService.setupWordPressK8S(
+        body.siteTitle,
+        body.wpAdminEmail,
+        body.wpAdminPassword,
+        body.wpAdminUser
+        
+       
       );
      
     } catch (error) {
@@ -48,45 +53,45 @@ export class SetupController {
   }
 
 
-  @Roles(Role.USER)
-  @Get('wordpress')
-  async findAll() {
-    return await this.setupService.findAll()
-  }
+  // @Roles(Role.USER)
+  // @Get('wordpress')
+  // async findAll() {
+  //   return await this.setupService.findAll()
+  // }
 
-  @Roles(Role.USER)
-  @Get('/wordpress:id')
-  async findOne(@Param('id') id: string) {
-    return await this.setupService.findOne(Number(id));
-  }
+  // @Roles(Role.USER)
+  // @Get('/wordpress:id')
+  // async findOne(@Param('id') id: string) {
+  //   return await this.setupService.findOne(Number(id));
+  // }
 
-  @Roles(Role.USER)
-  @Delete('/wordpress:id')
-  async remove(@Param('id') id: string) {
-    return await this.setupService.deleteWorpress(Number(id));
-  }
+  // @Roles(Role.USER)
+  // @Delete('/wordpress:id')
+  // async remove(@Param('id') id: string) {
+  //   return await this.setupService.deleteWorpress(Number(id));
+  // }
 
 
-  @Roles(Role.USER)
-  @Get('sitetitle')
-  async findBytitle() {
-    return await this.setupService.findByTitle()
-  }
+  // @Roles(Role.USER)
+  // @Get('sitetitle')
+  // async findBytitle() {
+  //   return await this.setupService.findByTitle()
+  // }
   
-  @Roles(Role.USER)
-  @Get('wordpress/port')
-  async findByport(){
-    return await this.setupService.findByport()
-  }
+  // @Roles(Role.USER)
+  // @Get('wordpress/port')
+  // async findByport(){
+  //   return await this.setupService.findByport()
+  // }
 
-  @Roles(Role.USER)
-  @Get('wordpress/username')
-  async findByusername(){
-    return await this.setupService.findByusername()
-  }
-  @Roles(Role.USER)
-  @Delete('wordpress')
-  async deleteSetup(@Query('setupId') setupId: number): Promise<string> {
-    return this.setupService.deleteSetupById(setupId);
-  }
+  // @Roles(Role.USER)
+  // @Get('wordpress/username')
+  // async findByusername(){
+  //   return await this.setupService.findByusername()
+  // }
+  // @Roles(Role.USER)
+  // @Delete('wordpress')
+  // async deleteSetup(@Query('setupId') setupId: number): Promise<string> {
+  //   return this.setupService.deleteSetupById(setupId);
+  // }
 }
