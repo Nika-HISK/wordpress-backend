@@ -18,32 +18,20 @@ import { Throttle } from '@nestjs/throttler';
 
 
 // @UseGuards(AuthGuard)
-@Controller('setup')
+@Controller('wordpress')
 export class SetupController {
   constructor(private readonly setupService: SetupService) {}
 
   @Throttle({ default: { limit: 1, ttl: 2000 } })
   @Roles(Role.USER)
-  @Post('wordpress')
+  @Post('setup')
   async setupWordpress(@Body() body: CreateSetupDto, @Req() req: any) {
-    
-    try {      
-      
-      const generateInstanceId = (): string => {
-        const randomPart = require('crypto').randomBytes(8).toString('hex');
-        const timestampPart = Date.now().toString(36);
-        return `${randomPart}-${timestampPart}`;
-      };
-      const instanceId = generateInstanceId();
-        await this.setupService.setupWordpress(
-        body,
-        instanceId,
-       req.user.id
-      );
-     
-    } catch (error) {
-
-    }
+    const userId = req.user.id
+    const response = await this.setupService.setupWordPress(body,userId);
+    return {
+      message: 'WordPress setup initiated successfully',
+      data: response,
+    };
   }
 
 
@@ -82,10 +70,5 @@ export class SetupController {
   @Get('wordpress/username')
   async findByusername(){
     return await this.setupService.findByusername()
-  }
-  @Roles(Role.USER)
-  @Delete('delete/wordpress')
-  async deleteContainerAndVolumes(@Body('containerName') containerName: string): Promise<string> {
-    return this.setupService.deleteContainerAndVolumes(containerName);
   }
 }

@@ -5,198 +5,185 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupRepository } from '../repositories/setup.repository';
+import * as crypto from 'crypto';
+import { KubernetesService } from './kubernetes.service';
 
 const execAsync = promisify(exec);
 
 @Injectable()
 export class SetupService {
-  constructor(private readonly setupRepository: SetupRepository
+  constructor(
+    private readonly setupRepository: SetupRepository,
+    private readonly k8sService: KubernetesService,
   ) {}
-  private usedPorts: Set<number> = new Set();
-  private portRange = { min: 4000, max: 8000 };
-  private async getAvailablePort(): Promise<number> {
-    for (let port = this.portRange.min; port <= this.portRange.max; port++) {
-      const portInUse = await this.setupRepository.findByPort(port);
-      if (!portInUse) {
-        this.usedPorts.add(port);
-        return port;
-      }
-    }
-    throw new Error('No available ports in the specified range.');
-  }
 
-  async setupWordpress(
-    config: CreateSetupDto,
-    instanceId: string,
-    id: number,
-  ): Promise<string> {
-    const { wpAdminUser, wpAdminPassword, wpAdminEmail, siteTitle } = config;
-    const instancePort = await this.getAvailablePort();
-    try {
-      console.log(`Starting WordPress setup for instance ${instanceId}...`);
-      const dockerComposeYml = `
-version: '3.8'
+  async setupWordPress(createSetupDto: CreateSetupDto, userId: number) {
+    const namespace = `user-${userId}`;
+    console.log(namespace);
+    const instanceId = crypto.randomBytes(4).toString('hex'); // Random instance suffix
+    const containerName = `wp-${instanceId}`;
+    const mysqlPassword = crypto.randomBytes(8).toString('hex'); // Secure MySQL password
+    const pvcName = `wp-pvc-${instanceId}`;
+    const ingressHost = `wordpress-${instanceId}.example.com`;
 
-services:
-  db${instanceId}:
-    image: mysql:8.0
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: ${wpAdminPassword}
-      MYSQL_DATABASE: ${siteTitle}
-      MYSQL_USER: ${wpAdminUser}
-      MYSQL_PASSWORD: ${wpAdminPassword}
-    volumes:
-      - db_data_${instanceId}:/var/lib/mysql
+    // Step 1: Create Namespace
+    await this.k8sService.createNamespace(namespace);
 
-  wordpress${instanceId}:
-    image: wordpress:latest
-    restart: always
-    depends_on:
-      - db${instanceId}
-    ports:
-      - "${instancePort}:80"
-    environment:
-      WORDPRESS_DB_HOST: db${instanceId}
-      WORDPRESS_DB_USER: ${wpAdminUser}
-      WORDPRESS_DB_PASSWORD: ${wpAdminPassword}
-    volumes:
-      - wp_uploads_${instanceId}:/var/www/html/wp-content/uploads 
+    // Step 2: Create MySQL Secret
+    const mysqlSecretManifest = {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: { name: `mysql-secret-${instanceId}`, namespace },
+      type: 'Opaque',
+      data: {
+        MYSQL_ROOT_PASSWORD: Buffer.from(mysqlPassword).toString('base64'),
+      },
+    };
+    await this.k8sService.applyManifest(namespace, mysqlSecretManifest);
 
-volumes:
-  db_data_${instanceId}:
-  wp_uploads_${instanceId}:
-      `;
+    // Step 3: Create Persistent Volume Claim (PVC)
+    const pvcManifest = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: { name: pvcName, namespace },
+      spec: {
+        accessModes: ['ReadWriteOnce'],
+        resources: { requests: { storage: '5Gi' } },
+      },
+    };
+    await this.k8sService.applyManifest(namespace, pvcManifest);
 
-      // Directory for instance-specific Docker setup
-      const instanceDir = path.join(
-        __dirname,
-        `wordpress_instance_${instanceId}`,
-      );
-      await fs.promises.mkdir(instanceDir, { recursive: true });
-      const filePath = path.join(instanceDir, 'docker-compose.yml');
+    // Step 4: Deploy MySQL
+    const mysqlDeploymentManifest = {
+      apiVersion: 'apps/v1',
+      kind: 'Deployment',
+      metadata: { name: `mysql-${instanceId}`, namespace },
+      spec: {
+        replicas: 1,
+        selector: { matchLabels: { app: `mysql-${instanceId}` } },
+        template: {
+          metadata: { labels: { app: `mysql-${instanceId}` } },
+          spec: {
+            containers: [
+              {
+                name: 'mysql',
+                image: 'mysql:5.7',
+                ports: [{ containerPort: 3306 }],
+                env: [
+                  {
+                    name: 'MYSQL_ROOT_PASSWORD',
+                    valueFrom: {
+                      secretKeyRef: {
+                        name: `mysql-secret-${instanceId}`,
+                        key: 'MYSQL_ROOT_PASSWORD',
+                      },
+                    },
+                  },
+                ],
+                volumeMounts: [
+                  { mountPath: '/var/lib/mysql', name: 'mysql-storage' },
+                ],
+              },
+            ],
+            volumes: [
+              {
+                name: 'mysql-storage',
+                persistentVolumeClaim: { claimName: pvcName },
+              },
+            ],
+          },
+        },
+      },
+    };
+    await this.k8sService.applyManifest(namespace, mysqlDeploymentManifest);
 
-      // Writing the docker-compose.yml file to disk
-      await fs.promises.writeFile(filePath, dockerComposeYml.trim());
-      console.log(
-        `docker-compose.yml file created for instance ${instanceId}.`,
-      );
+    // Step 5: Deploy WordPress
+    const wordpressDeploymentManifest = {
+      apiVersion: 'apps/v1',
+      kind: 'Deployment',
+      metadata: { name: containerName, namespace },
+      spec: {
+        replicas: 1,
+        selector: { matchLabels: { app: containerName } },
+        template: {
+          metadata: { labels: { app: containerName } },
+          spec: {
+            containers: [
+              {
+                name: 'wordpress',
+                image: 'wordpress:latest',
+                ports: [{ containerPort: 80 }],
+                env: [
+                  { name: 'WORDPRESS_DB_HOST', value: `mysql-${instanceId}` },
+                  { name: 'WORDPRESS_DB_USER', value: 'root' },
+                  {
+                    name: 'WORDPRESS_DB_PASSWORD',
+                    valueFrom: {
+                      secretKeyRef: {
+                        name: `mysql-secret-${instanceId}`,
+                        key: 'MYSQL_ROOT_PASSWORD',
+                      },
+                    },
+                  },
+                  { name: 'WORDPRESS_DB_NAME', value: 'wordpress' },
+                ],
+                volumeMounts: [
+                  { mountPath: '/var/www/html', name: 'wordpress-storage' },
+                ],
+              },
+            ],
+            volumes: [
+              {
+                name: 'wordpress-storage',
+                persistentVolumeClaim: { claimName: pvcName },
+              },
+            ],
+          },
+        },
+      },
+    };
+    await this.k8sService.applyManifest(namespace, wordpressDeploymentManifest);
 
-      const isWindows = process.platform === 'win32';
-      const dockerCommand = isWindows
-        ? 'docker-compose up -d'
-        : 'docker compose up -d';
+    // Step 6: Create Ingress
+    const ingressManifest = {
+      apiVersion: 'networking.k8s.io/v1',
+      kind: 'Ingress',
+      metadata: { name: `wp-ingress-${instanceId}`, namespace },
+      spec: {
+        rules: [
+          {
+            host: ingressHost,
+            http: {
+              paths: [
+                {
+                  path: '/',
+                  pathType: 'Prefix',
+                  backend: {
+                    service: { name: containerName, port: { number: 80 } },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    };
+    await this.k8sService.applyManifest(namespace, ingressManifest);
 
-      await execAsync(dockerCommand, { cwd: instanceDir });
-      console.log(`Docker services started for instance ${instanceId}.`);
+    // Step 7: Save setup details to the database
+    const setup = await this.setupRepository.SaveUserWordpress(
+      createSetupDto,
+      containerName,
+      80, // Instance port
+      userId, // User ID
+      '7.4', // PHP version
+    );
 
-      // Retrieve the WordPress container name without `grep`
-      const { stdout } = await execAsync(
-        `docker ps --filter "ancestor=wordpress" --format "{{.Names}}"`,
-      );
-      const wordpressContainerName = stdout
-        .split('\n')
-        .find((name) => name.includes(`wordpress${instanceId}`))
-        .trim();
-
-      if (!wordpressContainerName) {
-        throw new Error(`Failed to find container for instance ${instanceId}`);
-      }
-
-      console.log(
-        `WordPress container name for instance ${instanceId}: ${wordpressContainerName}`,
-      );
-
-      // Install WP-CLI and necessary tools
-      await execAsync(`docker exec ${wordpressContainerName} apt-get update`);
-      await execAsync(
-        `docker exec ${wordpressContainerName} apt-get install -y curl`,
-      );
-      await execAsync(
-        `docker exec ${wordpressContainerName} curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar`,
-      );
-      await execAsync(
-        `docker exec ${wordpressContainerName} chmod +x wp-cli.phar`,
-      );
-      await execAsync(
-        `docker exec ${wordpressContainerName} mv wp-cli.phar /usr/local/bin/wp`,
-      );
-      console.log(`WP-CLI installed in instance ${instanceId}.`);
-      await this.sleep(30000);
-
-      // Check if wp-config.php exists, and if so, remove it
-      console.log('Checking for existing wp-config.php...');
-      const checkConfigCmd = `docker exec ${wordpressContainerName} ls /var/www/html/wp-config.php`;
-      try {
-        await execAsync(checkConfigCmd); // Try to list the wp-config.php file
-        console.log('wp-config.php exists. Removing...');
-        await execAsync(
-          `docker exec ${wordpressContainerName} rm /var/www/html/wp-config.php`,
-        );
-        console.log('wp-config.php removed.');
-      } catch (error) {
-        console.log('wp-config.php does not exist. No need to remove.');
-      }
-      // Creating wp-config.php and installing WordPress
-      await execAsync(
-        `docker exec ${wordpressContainerName} wp config create --dbname=${siteTitle} --dbuser=${wpAdminUser} --dbpass=${wpAdminPassword} --dbhost=db${instanceId} --path=/var/www/html --allow-root`,
-      );
-      console.log(`wp-config.php created for instance ${instanceId}.`);
-
-      await execAsync(
-        `docker exec ${wordpressContainerName} wp core install --url="localhost:${instancePort}" --title="${siteTitle}" --admin_user="${wpAdminUser}" --admin_password="${wpAdminPassword}" --admin_email="${wpAdminEmail}" --skip-email --allow-root`,
-      );
-      console.log(`WordPress installed for instance ${instanceId}.`);
-
-      // Activate necessary plugins
-      await execAsync(
-        `docker exec ${wordpressContainerName} wp plugin install wordpress-importer --activate --allow-root`,
-      );
-      
-      await execAsync(
-        `docker exec ${wordpressContainerName} chown -R www-data:www-data /var/www/html`,
-      );
-
-      const wpInfoCmd = `docker exec ${wordpressContainerName} wp --info --json --allow-root`;
-      const { stdout: wpInfoJson } = await execAsync(wpInfoCmd);
-      const wpInfo = JSON.parse(wpInfoJson);
-      const phpVersion = wpInfo.php_version
-
-      await this.setupRepository.SaveUserWordpress(
-        config,
-        wordpressContainerName,
-        instancePort,
-        id,
-        phpVersion
-      );
-      return `WordPress setup complete for instance ${instanceId} on port ${instancePort}!`;
-    } catch (error) {
-      console.error(
-        `Error during WordPress setup for instance ${instanceId}:`,
-        error,
-      );
-      throw new Error(`WordPress setup failed for instance ${instanceId}`);
-    }
-  }
-
-  async deleteContainerAndVolumes(containerName: string): Promise<string> {
-    try {
-      const containerCheck = await execAsync(`docker ps -a --filter "name=${containerName}" --format "{{.Names}}"`);
-      if (!containerCheck.stdout.trim()) {
-        throw new NotFoundException(`Container '${containerName}' does not exist.`);
-      }
-      await execAsync(`docker stop ${containerName}`)
-
-      await execAsync(`docker rm --volumes ${containerName}`);
-
-      return `Container '${containerName}' and its associated volumes have been successfully deleted.`;
-    } catch (error) {
-      throw new Error(`Failed to delete container '${containerName}' and its volumes: ${error.message}`);
-    }
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return {
+      containerName,
+      namespace,
+      ingressUrl: `http://${ingressHost}`,
+    };
   }
 
   async deleteWorpress(id: number) {
@@ -215,11 +202,10 @@ volumes:
     return await this.setupRepository.findByTitle();
   }
   async findByport() {
-    return await this.setupRepository.findByport()
+    return await this.setupRepository.findByport();
   }
 
-  async findByusername(){
-    return await this.setupRepository.findByusername()
+  async findByusername() {
+    return await this.setupRepository.findByusername();
   }
-  
 }

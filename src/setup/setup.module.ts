@@ -10,6 +10,7 @@ import { WpPluginRepository } from 'src/wpcli/repositories/wpPlugin.repository';
 import { wpTheme } from 'src/wpcli/entities/wpTheme.entity';
 import { WpUser } from 'src/wpcli/entities/wpUser.entity';
 import { WpUserRepository } from 'src/wpcli/repositories/wpUser.repository';
+import { KubernetesService } from './services/kubernetes.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { WpUserRepository } from 'src/wpcli/repositories/wpUser.repository';
     UserModule,
   ],
   controllers: [SetupController],
-  providers: [SetupService, SetupRepository, WpPluginRepository, WpUserRepository],
+  providers: [SetupService, SetupRepository, WpPluginRepository, WpUserRepository,KubernetesService],
   exports: [SetupRepository, SetupService],
 })
 export class SetupModule {}
