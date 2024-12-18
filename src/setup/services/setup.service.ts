@@ -17,174 +17,145 @@ export class SetupService {
     private readonly k8sService: KubernetesService,
   ) {}
 
-  async setupWordPress(createSetupDto: CreateSetupDto, userId: number) {
-    const namespace = `user-${userId}`;
-    console.log(namespace);
-    const instanceId = crypto.randomBytes(4).toString('hex'); // Random instance suffix
-    const containerName = `wp-${instanceId}`;
-    const mysqlPassword = crypto.randomBytes(8).toString('hex'); // Secure MySQL password
-    const pvcName = `wp-pvc-${instanceId}`;
-    const ingressHost = `wordpress-${instanceId}.example.com`;
+ async setupWordPress(createSetupDto: CreateSetupDto, userId: number) {
+  const namespace = `user-${userId}`;
+  const instanceId = crypto.randomBytes(4).toString('hex');
+  const mysqlPassword = crypto.randomBytes(8).toString('hex');
 
-    // Step 1: Create Namespace
-    await this.k8sService.createNamespace(namespace);
+  // Step 1: Create Namespace
+  await this.k8sService.createNamespace(namespace);
 
-    // Step 2: Create MySQL Secret
-    const mysqlSecretManifest = {
-      apiVersion: 'v1',
-      kind: 'Secret',
-      metadata: { name: `mysql-secret-${instanceId}`, namespace },
-      type: 'Opaque',
-      data: {
-        MYSQL_ROOT_PASSWORD: Buffer.from(mysqlPassword).toString('base64'),
-      },
-    };
-    await this.k8sService.applyManifest(namespace, mysqlSecretManifest);
+  // Step 2: Create MySQL Secret
+  const mysqlSecretManifest = {
+    apiVersion: 'v1',
+    kind: 'Secret',
+    metadata: { name: `mysql-secret-${instanceId}`, namespace },
+    type: 'Opaque',
+    data: {
+      MYSQL_ROOT_PASSWORD: Buffer.from(mysqlPassword).toString('base64'),
+    },
+  };
+  await this.k8sService.applyManifest(namespace, mysqlSecretManifest);
 
-    // Step 3: Create Persistent Volume Claim (PVC)
-    const pvcManifest = {
-      apiVersion: 'v1',
-      kind: 'PersistentVolumeClaim',
-      metadata: { name: pvcName, namespace },
-      spec: {
-        accessModes: ['ReadWriteOnce'],
-        resources: { requests: { storage: '5Gi' } },
-      },
-    };
-    await this.k8sService.applyManifest(namespace, pvcManifest);
-
-    // Step 4: Deploy MySQL
-    const mysqlDeploymentManifest = {
-      apiVersion: 'apps/v1',
-      kind: 'Deployment',
-      metadata: { name: `mysql-${instanceId}`, namespace },
-      spec: {
-        replicas: 1,
-        selector: { matchLabels: { app: `mysql-${instanceId}` } },
-        template: {
-          metadata: { labels: { app: `mysql-${instanceId}` } },
-          spec: {
-            containers: [
-              {
-                name: 'mysql',
-                image: 'mysql:5.7',
-                ports: [{ containerPort: 3306 }],
-                env: [
-                  {
-                    name: 'MYSQL_ROOT_PASSWORD',
-                    valueFrom: {
-                      secretKeyRef: {
-                        name: `mysql-secret-${instanceId}`,
-                        key: 'MYSQL_ROOT_PASSWORD',
-                      },
-                    },
-                  },
-                ],
-                volumeMounts: [
-                  { mountPath: '/var/lib/mysql', name: 'mysql-storage' },
-                ],
-              },
-            ],
-            volumes: [
-              {
-                name: 'mysql-storage',
-                persistentVolumeClaim: { claimName: pvcName },
-              },
-            ],
-          },
-        },
-      },
-    };
-    await this.k8sService.applyManifest(namespace, mysqlDeploymentManifest);
-
-    // Step 5: Deploy WordPress
-    const wordpressDeploymentManifest = {
-      apiVersion: 'apps/v1',
-      kind: 'Deployment',
-      metadata: { name: containerName, namespace },
-      spec: {
-        replicas: 1,
-        selector: { matchLabels: { app: containerName } },
-        template: {
-          metadata: { labels: { app: containerName } },
-          spec: {
-            containers: [
-              {
-                name: 'wordpress',
-                image: 'wordpress:latest',
-                ports: [{ containerPort: 80 }],
-                env: [
-                  { name: 'WORDPRESS_DB_HOST', value: `mysql-${instanceId}` },
-                  { name: 'WORDPRESS_DB_USER', value: 'root' },
-                  {
-                    name: 'WORDPRESS_DB_PASSWORD',
-                    valueFrom: {
-                      secretKeyRef: {
-                        name: `mysql-secret-${instanceId}`,
-                        key: 'MYSQL_ROOT_PASSWORD',
-                      },
-                    },
-                  },
-                  { name: 'WORDPRESS_DB_NAME', value: 'wordpress' },
-                ],
-                volumeMounts: [
-                  { mountPath: '/var/www/html', name: 'wordpress-storage' },
-                ],
-              },
-            ],
-            volumes: [
-              {
-                name: 'wordpress-storage',
-                persistentVolumeClaim: { claimName: pvcName },
-              },
-            ],
-          },
-        },
-      },
-    };
-    await this.k8sService.applyManifest(namespace, wordpressDeploymentManifest);
-
-    // Step 6: Create Ingress
-    const ingressManifest = {
-      apiVersion: 'networking.k8s.io/v1',
-      kind: 'Ingress',
-      metadata: { name: `wp-ingress-${instanceId}`, namespace },
-      spec: {
-        rules: [
-          {
-            host: ingressHost,
-            http: {
-              paths: [
+  // Step 3: Deploy MySQL
+  const mysqlDeploymentManifest = {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: { name: `mysql-${instanceId}`, namespace },
+    spec: {
+      replicas: 1,
+      selector: { matchLabels: { app: `mysql-${instanceId}` } },
+      template: {
+        metadata: { labels: { app: `mysql-${instanceId}` } },
+        spec: {
+          containers: [
+            {
+              name: 'mysql',
+              image: 'mysql:8.0',
+              ports: [{ containerPort: 3306 }],
+              env: [
                 {
-                  path: '/',
-                  pathType: 'Prefix',
-                  backend: {
-                    service: { name: containerName, port: { number: 80 } },
+                  name: 'MYSQL_ROOT_PASSWORD',
+                  valueFrom: {
+                    secretKeyRef: {
+                      name: `mysql-secret-${instanceId}`,
+                      key: 'MYSQL_ROOT_PASSWORD',
+                    },
+                  },
+                },
+                { name: 'MYSQL_DATABASE', value: 'wordpress' },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  };
+  await this.k8sService.applyManifest(namespace, mysqlDeploymentManifest);
+
+  const mysqlServiceManifest = {
+    apiVersion: 'v1',
+    kind: 'Service',
+    metadata: { name: `mysql-${instanceId}`, namespace },
+    spec: {
+      ports: [{ protocol: 'TCP', port: 3306, targetPort: 3306 }],
+      selector: { app: `mysql-${instanceId}` },
+      type: 'ClusterIP',
+    },
+  };
+  await this.k8sService.applyManifest(namespace, mysqlServiceManifest);
+
+  // Step 4: Deploy WordPress
+  const wordpressDeploymentManifest = {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: { name: `wordpress-${instanceId}`, namespace },
+    spec: {
+      replicas: 1,
+      selector: { matchLabels: { app: `wordpress-${instanceId}` } },
+      template: {
+        metadata: { labels: { app: `wordpress-${instanceId}` } },
+        spec: {
+          containers: [
+            {
+              name: 'wordpress',
+              image: 'wordpress:latest',
+              ports: [{ containerPort: 80 }],
+              env: [
+                { name: 'WORDPRESS_DB_HOST', value: `mysql-${instanceId}:3306` },
+                { name: 'WORDPRESS_DB_NAME', value: 'wordpress' },
+                { name: 'WORDPRESS_DB_USER', value: 'root' },
+                {
+                  name: 'WORDPRESS_DB_PASSWORD',
+                  valueFrom: {
+                    secretKeyRef: {
+                      name: `mysql-secret-${instanceId}`,
+                      key: 'MYSQL_ROOT_PASSWORD',
+                    },
                   },
                 },
               ],
             },
-          },
-        ],
+          ],
+        },
       },
-    };
-    await this.k8sService.applyManifest(namespace, ingressManifest);
+    },
+  };
+  await this.k8sService.applyManifest(namespace, wordpressDeploymentManifest);
 
-    // Step 7: Save setup details to the database
-    const setup = await this.setupRepository.SaveUserWordpress(
-      createSetupDto,
-      containerName,
-      80, // Instance port
-      userId, // User ID
-      '7.4', // PHP version
-    );
+  const wordpressServiceManifest = {
+    apiVersion: 'v1',
+    kind: 'Service',
+    metadata: { name: `wordpress-${instanceId}`, namespace },
+    spec: {
+      ports: [
+        { protocol: 'TCP', port: 8081, targetPort: 80 },
+      ],
+      selector: { app: `wordpress-${instanceId}` },
+      type: 'LoadBalancer', // Expose WordPress via LoadBalancer
+    },
+  };
+  await this.k8sService.applyManifest(namespace, wordpressServiceManifest);
 
-    return {
-      containerName,
-      namespace,
-      ingressUrl: `http://${ingressHost}`,
-    };
-  }
+  // Save to the database
+  await this.setupRepository.SaveUserWordpress(
+    createSetupDto,
+    `wordpress-${instanceId}`,
+    8081,
+    userId,
+    '5.8',
+  );
+
+  // Retrieve NodePort for WordPress (if exposed as LoadBalancer)
+  const wordpressService = await this.k8sService.getService(namespace, `wordpress-${instanceId}`);
+  const nodePort = wordpressService.spec.ports.find(port => port.port === 8081)?.nodePort;
+
+  return {
+    namespace,
+    wordpressUrl: `http://<node-ip>:${nodePort}`, // Replace <node-ip> with your cluster's node IP
+  };
+}
+
 
   async deleteWorpress(id: number) {
     return await this.setupRepository.deleteUser(id);
