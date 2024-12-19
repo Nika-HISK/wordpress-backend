@@ -13,6 +13,7 @@ import shellEscape from 'shell-escape';
 import { WpPluginRepository } from '../repositories/wpPlugin.repository';
 import { WpThemeRepository } from '../repositories/wpTheme.repository';
 import { WpUserRepository } from '../repositories/wpUser.repository';
+import { SetupService } from 'src/setup/services/setup.service';
 
 const execAsync = promisify(exec);
 
@@ -23,7 +24,8 @@ export class wpcliService {
     private readonly setupRepository: Repository<Setup>,
     private readonly wpPluginRepository:WpPluginRepository,
     private readonly wpThemeRepository:WpThemeRepository,
-    private readonly wpUserRepository:WpUserRepository
+    private readonly wpUserRepository:WpUserRepository,
+    private readonly setupService:SetupService
     
   ) {}
 
@@ -74,13 +76,21 @@ export class wpcliService {
   }
 
   async wpMaintenance(
-    setupId:number,
-    userId: number,
+    setupId: number,
     mode: 'enable' | 'disable',
-  ): Promise<string> {
-    const subCommand = mode === 'enable' ? 'activate' : 'deactivate';
-    return this.execWpCli(setupId,userId, `maintenance-mode ${subCommand}`);
+  ) {
+    const fullCommand = mode === 'enable' 
+    ? 'wp maintenance-mode activate --allow-root' 
+    : 'wp maintenance-mode deactivate --allow-root';
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, fullCommand);
   }
+  
 
   async wpCacheAdd(
     setupId:number,

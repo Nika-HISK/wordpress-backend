@@ -40,10 +40,9 @@ export class wpcliController {
   @Post('maintenance/:mode')
   async wpMaintenance(
     @Query('setupId') setupId: number,
-    @Req() req: any,
     @Param('mode') mode: 'enable' | 'disable',
   ) {
-    return this.wpCliService.wpMaintenance(setupId,req.user.id, mode);
+    return this.wpCliService.wpMaintenance(setupId, mode);
   }
 
   @Roles(Role.USER)
