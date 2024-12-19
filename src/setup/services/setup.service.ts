@@ -18,7 +18,7 @@ export class SetupService {
   ) {}
 
   async runKubectlCommand(namespace: string, podName: string, command: string) {
-    const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -- ${command} --allow-root`;
+    const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -- ${command}`;
     try {
       const { stdout, stderr } = await execAsync(kubectlCommand);
       if (stderr) {
@@ -34,7 +34,7 @@ export class SetupService {
   async setupWordPress(createSetupDto: CreateSetupDto, userId: number) {
     const namespace = `user-${userId}`;
     const instanceId = crypto.randomBytes(4).toString('hex');
-    const uniqueId = crypto.randomBytes(6).toString('hex'); // Generate unique ID for labeling
+    const uniqueId = crypto.randomBytes(6).toString('hex');
     const mysqlPassword = crypto.randomBytes(8).toString('hex');
     const siteTitle = createSetupDto.siteTitle || 'My WordPress Site';
     const wpAdminUser = createSetupDto.wpAdminUser || 'admin';
