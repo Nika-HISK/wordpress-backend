@@ -112,7 +112,7 @@ export class wpcliService {
     setupId: number,
     search?: string
   ): Promise<any> {
-    const command = 'wp theme list --format=json';
+    const command = 'wp theme list --format=json --allow-root';
   
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {
@@ -137,85 +137,141 @@ export class wpcliService {
   
     return themes;
   }
-  async wpThemeActivate(setupId:number,userId: number, theme: string): Promise<string> {
+
+  async wpThemeActivate(setupId: number,theme: string): Promise<string> {
     if (!theme) {
       throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);
     }
-    return this.execWpCli(setupId,userId, `theme activate ${theme}`);
+  
+    const command = `wp theme activate ${theme} --allow-root`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
 
-  async wpThemeDelete(setupId:number,userId: number, theme: string): Promise<string> {
-
-    await this.wpThemeRepository.deleteThemes(theme)
-
+  async wpThemeDelete(setupId: number, theme: string): Promise<string> {
     if (!theme) {
       throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);
     }
-    return this.execWpCli(setupId,userId, `theme delete ${theme}`);
+  
+    await this.wpThemeRepository.deleteThemes(theme);
+  
+    const command = `wp theme delete ${theme} --allow-root`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
 
-  async wpThemeUpdate(setupId:number,userId: number, theme: string): Promise<string> {
+
+  async wpThemeUpdate(setupId: number, theme: string): Promise<string> {
     if (!theme) {
       throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);
     }
-    return this.execWpCli(setupId,userId, `theme update ${theme}`);
+  
+    const command = `wp theme update ${theme} --allow-root`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
-  async wpPluginList(setupId:number,userId: number, search?: string): Promise<any> {
-    console.log(setupId);
-    
-    const command = 'plugin list --status=active,inactive --format=json';
-    const output = await this.execWpCli(setupId,userId, command);
+
+
+  async wpPluginList(setupId: number, search?: string): Promise<any> {
+    const command = 'wp plugin list --status=active,inactive --format=json --allow-root';
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    const output = await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
     const plugins = JSON.parse(output);
-
-    await this.wpPluginRepository.saveUserPlugins(plugins, setupId)
+  
+    await this.wpPluginRepository.saveUserPlugins(plugins, setupId);
   
     if (search) {
       return plugins.filter(plugin =>
         plugin.name?.toLowerCase().includes(search.toLowerCase())
       );
     }
+  
     return plugins;
   }
-  async wpPluginActivate(setupId:number,userId: number, plugin: string): Promise<string> {
+
+
+  async wpPluginActivate(setupId: number, plugin: string): Promise<string> {
     if (!plugin) {
-      throw new HttpException(
-        'Plugin name is required',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('Plugin name is required', HttpStatus.BAD_REQUEST);
     }
-    return this.execWpCli(setupId,userId, `plugin activate ${plugin}`);
+  
+    const command = `wp plugin activate ${plugin} --allow-root`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
 
-  async wpPluginDeactivate(setupId:number,userId: number, plugin: string): Promise<string> {
+
+  async wpPluginDeactivate(setupId: number, plugin: string): Promise<string> {
     if (!plugin) {
-      throw new HttpException(
-        'Plugin name is required',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('Plugin name is required', HttpStatus.BAD_REQUEST);
     }
-    return this.execWpCli(setupId,userId, `plugin deactivate ${plugin}`);
+  
+    const command = `wp plugin deactivate ${plugin} --allow-root`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
 
-  async wpPluginDelete(setupId:number,userId: number, plugin: string): Promise<string> {
-    await this.wpPluginRepository.deletePlugins(plugin)
-    
+  async wpPluginDelete(setupId: number, plugin: string): Promise<string> {
     if (!plugin) {
-      throw new HttpException(
-        'Plugin name is required',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('Plugin name is required', HttpStatus.BAD_REQUEST);
     }
-    return this.execWpCli(setupId,userId, `plugin delete ${plugin}`);
+  
+    await this.wpPluginRepository.deletePlugins(plugin);
+  
+    const command = `wp plugin delete ${plugin} --allow-root`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
 
-  async wpPluginUpdate(setupId:number,userId: number, plugin: string): Promise<string> {
+
+  async wpPluginUpdate(setupId: number, plugin: string): Promise<string> {
     if (!plugin) {
-      throw new HttpException(
-        'Plugin name is required',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new HttpException('Plugin name is required', HttpStatus.BAD_REQUEST);
     }
-    return this.execWpCli(setupId,userId, `plugin update ${plugin}`);
+  
+    const command = `wp plugin update ${plugin} --allow-root`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
   async wpUserList(setupId:number, search?: string): Promise<any> {
 
@@ -308,8 +364,15 @@ export class wpcliService {
     return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
 
-  async wpCoreCheckUpdate(setupId:number,userId: number): Promise<any> {
-    const output = await this.execWpCli(setupId,userId, 'core check-update --format=json');
+  async wpCoreCheckUpdate(setupId: number): Promise<any> {
+    const command = 'wp core check-update --format=json --allow-root';
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    const output = await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
     const updates = JSON.parse(output);
   
     if (updates.length === 0) {
@@ -318,13 +381,19 @@ export class wpcliService {
   
     return updates;
   }
-  async wpDbSize(setupId:number,userId: number): Promise<any> {
-    const output = await this.execWpCli(setupId,
-      userId,
-      'db size --format=json',
-    );
+
+  async wpDbSize(setupId: number): Promise<any> {
+    const command = 'wp db size --format=json --allow-root';
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    const output = await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
     return JSON.parse(output);
   }
+  
 
   async wpRoles(setupId: number): Promise<any> {
     const setup = await this.setupService.findOne(setupId);
@@ -341,13 +410,22 @@ export class wpcliService {
     return version
   }
 
-  async wpGetPhpVersion(setupId:number,userId: number): Promise<object> {
-    const output = await this.execWpCli(setupId,userId, '--info --format=json');
+  async wpGetPhpVersion(setupId: number): Promise<object> {
+    const command = 'wp --info --format=json --allow-root';
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    const output = await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
     const info = JSON.parse(output);
+  
     if (!info.php_version) {
       throw new Error('PHP version information not found in WP-CLI output.');
     }
-    const phpVerion = {phpVersion:info.php_version}
-    return phpVerion;
+  
+    const phpVersion = { phpVersion: info.php_version };
+    return phpVersion;
   }
 }
