@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import * as fs from 'fs';
 import * as path from 'path';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupRepository } from '../repositories/setup.repository';
@@ -232,9 +231,65 @@ export class SetupService {
     };
   }
 
-  async deleteWorpress(id: number) {
-    return await this.setupRepository.deleteUser(id);
+  async deleteWordpress(id: number) {
+    const setup = await this.setupRepository.findOne(id);
+    if (!setup) {
+      throw new Error(`Setup with ID ${id} not found`);
+    }
+  
+    const { wordpressContainerName, dbContainerName } = setup;
+    
+    let wordpressVolumes: string[] = [];
+    let dbVolumes: string[] = [];
+  
+    try {
+      wordpressVolumes = await this.getVolumes(wordpressContainerName);
+  
+      await execAsync(`docker container stop ${wordpressContainerName}`);
+      await execAsync(`docker container rm ${wordpressContainerName}`);
+    } catch (error) {
+      console.error(`Failed to stop or delete WordPress container: ${error.message}`);
+    }
+  
+    try {
+      dbVolumes = await this.getVolumes(dbContainerName);
+  
+      await execAsync(`docker container stop ${dbContainerName}`);
+      await execAsync(`docker container rm ${dbContainerName}`);
+    } catch (error) {
+      console.error(`Failed to stop or delete DB container: ${error.message}`);
+    }
+  
+    try {
+      const allVolumes = [...wordpressVolumes, ...dbVolumes];
+      for (const volume of allVolumes) {
+        await execAsync(`docker volume rm ${volume}`);
+      }
+    } catch (error) {
+      console.error(`Failed to remove volumes: ${error.message}`);
+      throw error;
+    }
+  
+    return await this.setupRepository.deleteSetup(id);
   }
+  
+  private async getVolumes(containerName: string): Promise<string[]> {
+    if (!containerName) return [];
+  
+    try {
+      const { stdout } = await execAsync(`docker inspect ${containerName}`);
+      const containerDetails = JSON.parse(stdout);
+  
+      const volumes = containerDetails[0]?.Mounts?.map((mount) => mount.Name).filter(Boolean) || [];
+      return volumes;
+    } catch (error) {
+      console.error(`Failed to get volumes for container ${containerName}: ${error.message}`);
+      return [];
+    }
+  }
+  
+  
+  
 
   async findAll() {
     return await this.setupRepository.findAll();

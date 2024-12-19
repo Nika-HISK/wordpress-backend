@@ -55,6 +55,11 @@ export class SetupRepository {
   }
 
 
+  async deleteSetup(id: number): Promise<void> {
+    await this.setupRepository.softDelete(id);
+  }
+
+
    async findOne(id:number) {
     return await this.setupRepository.findOneBy({id})
   }

@@ -4,6 +4,8 @@ import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
 import shellEscape from 'shell-escape';
 
+@ApiTags('WP CLI')
+@ApiBearerAuth()
 @Controller('wp-cli')
 export class wpcliController {
   constructor(private readonly wpCliService: wpcliService) {}
@@ -16,7 +18,10 @@ export class wpcliController {
     @Body('data') data: string,
     @Body('group') group: string,
   ) {
-    return this.wpCliService.wpCacheAdd(setupId,req.user.id, key, data, group);
+    const { key, data, group } = body;
+    const userId = req.user.id;
+    const setupId = params.setupId;
+    return this.wpCliService.wpCacheAdd(setupId, userId, key, data, group);
   }
 
   @Roles(Role.USER)
@@ -52,6 +57,9 @@ export class wpcliController {
     @Body('replace') replace: string,
     @Body('options') options: Record<string, any>,
   ) {
+    const userId = req.user.id;
+    const { setupId } = params;
+    const { search, replace, options } = body;
     try {
       const result = await this.wpCliService.wpSearchReplace(setupId,
         search,

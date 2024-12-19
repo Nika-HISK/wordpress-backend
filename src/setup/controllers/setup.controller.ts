@@ -9,12 +9,14 @@ import {
   HttpStatus,
   Req,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupService } from '../services/setup.service';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
 import { Throttle } from '@nestjs/throttler';
+import { ExtendedRequest } from 'src/auth/dto/extended-request.interface';
 
 
 // @UseGuards(AuthGuard)
@@ -24,14 +26,27 @@ export class SetupController {
 
   @Throttle({ default: { limit: 1, ttl: 2000 } })
   @Roles(Role.USER)
-  @Post('setup')
-  async setupWordpress(@Body() body: CreateSetupDto, @Req() req: any) {
+  @Post('wordpress')
+  async setupWordpress(@Body() body: CreateSetupDto, @Req() req: ExtendedRequest) {
     const userId = req.user.id
-    const response = await this.setupService.setupWordPress(body,userId);
-    return {
-      message: 'WordPress setup initiated successfully',
-      data: response,
-    };
+    
+    try {      
+      
+      const generateInstanceId = (): string => {
+        const randomPart = require('crypto').randomBytes(8).toString('hex');
+        const timestampPart = Date.now().toString(36);
+        return `${randomPart}-${timestampPart}`;
+      };
+      const instanceId = generateInstanceId();
+        await this.setupService.setupWordpress(
+        body,
+        instanceId,
+        userId
+      );
+     
+    } catch (error) {
+
+    }
   }
 
 
@@ -48,9 +63,9 @@ export class SetupController {
   }
 
   @Roles(Role.USER)
-  @Delete('/wordpress:id')
+  @Delete('/wordpress/:id')
   async remove(@Param('id') id: string) {
-    return await this.setupService.deleteWorpress(Number(id));
+    return await this.setupService.deleteWordpress(Number(id));
   }
 
 
