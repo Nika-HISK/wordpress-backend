@@ -292,9 +292,22 @@ export class wpcliService {
     return wpUsers;
   }
   
-  async wpUserDelete(setupId:number,userId: number, targetUserId: number): Promise<string> {
-    await this.wpUserRepository.deleteWpUsers(targetUserId)
-    await this.execWpCli(setupId,userId, `user delete ${targetUserId} --yes`);
+  async wpUserDelete(setupId: number, targetUserId: number): Promise<string> {
+    if (!targetUserId) {
+      throw new HttpException('Target user ID is required', HttpStatus.BAD_REQUEST);
+    }
+  
+    await this.wpUserRepository.deleteWpUsers(targetUserId);
+  
+    const command = `wp user delete ${targetUserId} --yes --allow-root`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
+  
     return `User with ID ${targetUserId} has been deleted from WordPress`;
   }
 

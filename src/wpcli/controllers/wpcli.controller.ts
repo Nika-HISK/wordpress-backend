@@ -8,9 +8,9 @@ import shellEscape from 'shell-escape';
 export class wpcliController {
   constructor(private readonly wpCliService: wpcliService) {}
 
-  @Post('cache/add')
+  @Post('cache/add/:setupId')
   async wpCacheAdd(
-    @Query('setupId') setupId: number,
+    @Param('setupId') setupId: number,
     @Req() req: any,
     @Body('key') key: string,
     @Body('data') data: string,
@@ -20,8 +20,8 @@ export class wpcliController {
   }
 
   @Roles(Role.USER)
-  @Get('maintenance/status')
-  async getMaintenanceStatus(@Query('setupId') setupId: number) {
+  @Get('maintenance/status/:setupId')
+  async getMaintenanceStatus(@Param('setupId') setupId: number) {
     try {
       const status = await this.wpCliService.wpGetMaintenanceStatus(setupId);
       return {
@@ -36,18 +36,18 @@ export class wpcliController {
     }
   }
   @Roles(Role.USER)
-  @Patch('maintenance/:mode')
+  @Patch('maintenance/:mode/:setupId')
   async wpMaintenance(
-    @Query('setupId') setupId: number,
+    @Param('setupId') setupId: number,
     @Param('mode') mode: 'enable' | 'disable',
   ) {
     return this.wpCliService.wpMaintenance(setupId, mode);
   }
 
   @Roles(Role.USER)
-  @Post('search-replace')
+  @Post('search-replace/:setupId')
   async wpSearchReplace(
-    @Query('setupId') setupId: number,
+    @Param('setupId') setupId: number,
     @Body('search') search: string,
     @Body('replace') replace: string,
     @Body('options') options: Record<string, any>,
@@ -71,108 +71,108 @@ export class wpcliController {
   }
 
   @Roles(Role.USER)
-  @Get('theme')
-  async wpThemeList(@Query('setupId') setupId: number, @Query('search') search?: string) {
+  @Get('theme/:setupId')
+  async wpThemeList(@Param('setupId') setupId: number, @Query('search') search?: string) {
     return this.wpCliService.wpThemeList(setupId, search);
   }
 
   @Roles(Role.USER)
-  @Patch('theme')
-  async wpThemeActivate(@Query('setupId') setupId: number,@Body('theme') theme: string) {
+  @Patch('theme/:setupId')
+  async wpThemeActivate(@Param('setupId') setupId: number,@Body('theme') theme: string) {
     return this.wpCliService.wpThemeActivate(setupId,theme);
   }
 
   @Roles(Role.USER)
-  @Delete('theme')
-  async wpThemeDelete(@Query('setupId') setupId: number,@Body('theme') theme: string) {
+  @Delete('theme/:setupId')
+  async wpThemeDelete(@Param('setupId') setupId: number,@Body('theme') theme: string) {
     return this.wpCliService.wpThemeDelete(setupId,theme);
   }
 
   @Roles(Role.USER)
-  @Put('theme')
-  async wpThemeUpdate(@Query('setupId') setupId: number, @Body('theme') theme: string) {
+  @Put('theme/:setupId')
+  async wpThemeUpdate(@Param('setupId') setupId: number, @Body('theme') theme: string) {
     return this.wpCliService.wpThemeUpdate(setupId,theme);
   }
 
   @Roles(Role.USER)
-  @Get('plugin')
-  async wpPluginList(@Query('setupId') setupId: number, @Query('search') search?: string) {
+  @Get('plugin/:setupId')
+  async wpPluginList(@Param('setupId') setupId: number, @Query('search') search?: string) {
     return this.wpCliService.wpPluginList(setupId,search);
   }
 
   @Roles(Role.USER)
-  @Patch('plugin/enable')
-  async wpPluginActivate(@Query('setupId') setupId: number,@Body('plugin') plugin: string) {
+  @Patch('plugin/enable/:setupId')
+  async wpPluginActivate(@Param('setupId') setupId: number,@Body('plugin') plugin: string) {
     return this.wpCliService.wpPluginActivate(setupId,plugin);
   }
 
   @Roles(Role.USER)
-  @Patch('plugin/disable')
-  async wpPluginDeactivate(@Query('setupId') setupId: number,@Body('plugin') plugin: string) {
+  @Patch('plugin/disable/:setupId')
+  async wpPluginDeactivate(@Param('setupId') setupId: number,@Body('plugin') plugin: string) {
     return this.wpCliService.wpPluginDeactivate(setupId,plugin);
   }
 
   @Roles(Role.USER)
-  @Delete('plugin')
-  async wpPluginDelete(@Query('setupId') setupId: number,@Body('plugin') plugin: string) {
+  @Delete('plugin/:setupId')
+  async wpPluginDelete(@Param('setupId') setupId: number,@Body('plugin') plugin: string) {
     return this.wpCliService.wpPluginDelete(setupId, plugin);
   }
 
   @Roles(Role.USER)
-  @Put('plugin')
-  async wpPluginUpdate(@Query('setupId') setupId: number,@Body('plugin') plugin: string) {
+  @Put('plugin/:setupId')
+  async wpPluginUpdate(@Param('setupId') setupId: number,@Body('plugin') plugin: string) {
     return this.wpCliService.wpPluginUpdate(setupId,plugin);
   }
 
   @Roles(Role.USER)
-  @Get('wpuser')
-  async wpUserList(@Query('setupId') setupId: number, @Query('search') search?: string) {
+  @Get('wpuser/:setupId')
+  async wpUserList(@Param('setupId') setupId: number, @Query('search') search?: string) {
     return this.wpCliService.wpUserList(setupId, search);
   }
   
 
   @Roles(Role.USER)
-  @Post('wpuser/delete')
-  async wpUserDelete(@Query('setupId') setupId: number,@Req() req: any, @Body('userId') userId: number) {
-    return this.wpCliService.wpUserDelete(setupId,req.user.id, userId);
+  @Delete('wpuser/:setupId')
+  async wpUserDelete(@Param('setupId') setupId: number,@Body('userId') userId: number) {
+    return this.wpCliService.wpUserDelete(setupId,userId);
   }
 
   @Roles(Role.USER)
-  @Patch('wprole')
+  @Patch('wprole/:setupId')
   async wpUserRoleUpdate(
-    @Query('setupId') setupId: number,
+    @Param('setupId') setupId: number,
     @Body('userId') userId: number,
     @Body('role') role: string,
   ) {
     return this.wpCliService.wpUserRoleUpdate(setupId, userId, role);
   }
   @Roles(Role.USER)
-  @Get('core/version')
-  async wpCoreVersion(@Query('setupId') setupId: number,@Req() req: any) {
+  @Get('core/version/:setupId')
+  async wpCoreVersion(@Param('setupId') setupId: number,@Req() req: any) {
     return this.wpCliService.wpCoreVersion(setupId,req.user.id);
   }
 
   @Roles(Role.USER)
-  @Get('wpcore/check-update')
-  async wpCoreCheckUpdate(@Query('setupId') setupId: number,) {
+  @Get('wpcore/check-update/:setupId')
+  async wpCoreCheckUpdate(@Param('setupId') setupId: number,) {
     return this.wpCliService.wpCoreCheckUpdate(setupId);
   }
 
   @Roles(Role.USER)
-  @Get('db/name')
-  async wpDbSize(@Query('setupId') setupId: number,) {
+  @Get('db/name/:setupId')
+  async wpDbSize(@Param('setupId') setupId: number,) {
     return this.wpCliService.wpDbSize(setupId);
   }
 
   @Roles(Role.USER)
-  @Get('wprole')
-  async wpRoles(@Query('setupId') setupId: number) {
+  @Get('wprole/:setupId')
+  async wpRoles(@Param('setupId') setupId: number) {
     return await this.wpCliService.wpRoles(setupId)
   }
 
   @Roles(Role.USER)
-  @Get('php/version')
-  async wpGetPhpVersion(@Query('setupId') setupId: number,): Promise<any> {
+  @Get('php/version/:setupId')
+  async wpGetPhpVersion(@Param('setupId') setupId: number,): Promise<any> {
     return this.wpCliService.wpGetPhpVersion(setupId,);
   }
 }
