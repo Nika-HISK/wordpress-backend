@@ -80,8 +80,8 @@ export class wpcliService {
     mode: 'enable' | 'disable',
   ) {
     const fullCommand = mode === 'enable' 
-    ? 'wp maintenance-mode activate --allow-root' 
-    : 'wp maintenance-mode deactivate --allow-root';
+    ? 'wp maintenance-mode activate' 
+    : 'wp maintenance-mode deactivate';
   
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {
@@ -104,21 +104,35 @@ export class wpcliService {
 
 
 
-  async wpThemeList(setupId:number,userId: number, search?: string): Promise<any> {
-    const command = `theme list --format=json`;
-    const output = await this.execWpCli(setupId,userId, command);
+  async wpThemeList(
+    setupId: number,
+    search?: string
+  ): Promise<any> {
+    const command = 'wp theme list --format=json';
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    const output = await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      command
+    );
+  
     const themes = JSON.parse(output);
   
-    await this.wpThemeRepository.saveUserThemes(themes, setupId)
-
+    await this.wpThemeRepository.saveUserThemes(themes, setupId);
+  
     if (search) {
       return themes.filter(theme =>
         theme.name?.toLowerCase().includes(search.toLowerCase())
       );
     }
+  
     return themes;
   }
-
   async wpThemeActivate(setupId:number,userId: number, theme: string): Promise<string> {
     if (!theme) {
       throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);

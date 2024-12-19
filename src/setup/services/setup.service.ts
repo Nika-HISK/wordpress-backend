@@ -18,7 +18,7 @@ export class SetupService {
   ) {}
 
   async runKubectlCommand(namespace: string, podName: string, command: string) {
-    const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -- ${command}`;
+    const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -- ${command} --allow-root`;
     try {
       const { stdout, stderr } = await execAsync(kubectlCommand);
       if (stderr) {
@@ -219,9 +219,9 @@ export class SetupService {
       namespace,
       createSetupDto,
       podName,
-      8081,
+      nodePort,
       userId,
-      '5.8',
+      '8.0',
     );
 
     // Retrieve NodePort for WordPress (if exposed as LoadBalancer)

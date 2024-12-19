@@ -15,7 +15,7 @@ export class SetupRepository {
     nameSpace:string,
     createSetupDto: CreateSetupDto,
     podName: string,
-    instancePort: number,
+    Port: number,
     id: number,
     phpVersion: string,
   ): Promise<Setup> {
@@ -25,7 +25,7 @@ export class SetupRepository {
     newSetup.wpAdminEmail = createSetupDto.wpAdminEmail;
     newSetup.wpAdminPassword = createSetupDto.wpAdminPassword;
     newSetup.siteTitle = createSetupDto.siteTitle;
-    newSetup.instancePort = instancePort;
+    newSetup.port = Port;
     newSetup.podName = podName;
     newSetup.userId = id;
     newSetup.phpVersion = phpVersion;
@@ -34,7 +34,7 @@ export class SetupRepository {
   }
 
   async findByPort(port: number): Promise<Setup | null> {
-    return await this.setupRepository.findOneBy({ instancePort: port });
+    return await this.setupRepository.findOneBy({ port: port });
   }
   
 
@@ -61,7 +61,7 @@ export class SetupRepository {
 
   async findByport(){
     const port = await this.setupRepository.find({
-      select:['instancePort']
+      select:['port']
     })
     return port
   }

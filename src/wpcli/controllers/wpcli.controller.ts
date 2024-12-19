@@ -75,8 +75,8 @@ export class wpcliController {
 
   @Roles(Role.USER)
   @Get('theme/list')
-  async wpThemeList(@Query('setupId') setupId: number,@Req() req: any, @Query('search') search?: string) {
-    return this.wpCliService.wpThemeList(setupId,req.user.id, search);
+  async wpThemeList(@Query('setupId') setupId: number, @Query('search') search?: string) {
+    return this.wpCliService.wpThemeList(setupId, search);
   }
 
   @Roles(Role.USER)

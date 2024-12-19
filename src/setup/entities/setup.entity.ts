@@ -29,7 +29,7 @@ export class Setup extends baseEntity {
   phpVersion:string
 
   @Column()
-  instancePort:number
+  port:number
 
   @Column()
   userId:number
