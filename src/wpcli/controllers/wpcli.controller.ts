@@ -1,7 +1,8 @@
-import { Controller, Body, Post, Req, Param, Get, Query } from '@nestjs/common';
+import { Controller, Body, Post, Req, Param, Get, Query, Patch } from '@nestjs/common';
 import { wpcliService } from '../services/wpcli.service';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
+import shellEscape from 'shell-escape';
 
 @Controller('wp-cli')
 export class wpcliController {
@@ -20,11 +21,9 @@ export class wpcliController {
 
   @Roles(Role.USER)
   @Get('maintenance/status')
-  async getMaintenanceStatus(@Query('setupId') setupId: number,@Req() req: any) {
+  async getMaintenanceStatus(@Query('setupId') setupId: number) {
     try {
-      const status = await this.wpCliService.wpGetMaintenanceStatus(setupId,
-        req.user.id,
-      );
+      const status = await this.wpCliService.wpGetMaintenanceStatus(setupId);
       return {
         status: 'success',
         data: status,
@@ -37,7 +36,7 @@ export class wpcliController {
     }
   }
   @Roles(Role.USER)
-  @Post('maintenance/:mode')
+  @Patch('maintenance/:mode')
   async wpMaintenance(
     @Query('setupId') setupId: number,
     @Param('mode') mode: 'enable' | 'disable',
@@ -49,14 +48,12 @@ export class wpcliController {
   @Post('search-replace')
   async wpSearchReplace(
     @Query('setupId') setupId: number,
-    @Req() req: any,
     @Body('search') search: string,
     @Body('replace') replace: string,
     @Body('options') options: Record<string, any>,
   ) {
     try {
       const result = await this.wpCliService.wpSearchReplace(setupId,
-        req.user.id,
         search,
         replace,
         options,
@@ -128,9 +125,9 @@ export class wpcliController {
   }
 
   @Roles(Role.USER)
-  @Get('wpuser/list')
-  async wpUserList(@Query('setupId') setupId: number,@Req() req: any, @Query('search') search?: string) {
-    return this.wpCliService.wpUserList(setupId,req.user.id, search);
+  @Get('wpuser')
+  async wpUserList(@Query('setupId') setupId: number, @Query('search') search?: string) {
+    return this.wpCliService.wpUserList(setupId, search);
   }
   
 
@@ -141,14 +138,13 @@ export class wpcliController {
   }
 
   @Roles(Role.USER)
-  @Post('wprole/update')
+  @Patch('wprole')
   async wpUserRoleUpdate(
     @Query('setupId') setupId: number,
-    @Req() req: any,
     @Body('userId') userId: number,
     @Body('role') role: string,
   ) {
-    return this.wpCliService.wpUserRoleUpdate(setupId,req.user.id, userId, role);
+    return this.wpCliService.wpUserRoleUpdate(setupId, userId, role);
   }
   @Roles(Role.USER)
   @Get('core/version')
@@ -169,9 +165,9 @@ export class wpcliController {
   }
 
   @Roles(Role.USER)
-  @Get('wprole/list')
-  async getRoles(@Query('setupId') setupId: number,@Req() req: any) {
-    return this.wpCliService.wpRoleList(setupId,req.user.id);
+  @Get('wprole')
+  async wpRoles(@Query('setupId') setupId: number) {
+    return await this.wpCliService.wpRoles(setupId)
   }
 
   @Roles(Role.USER)

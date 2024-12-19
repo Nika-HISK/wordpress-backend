@@ -58,7 +58,7 @@ export class wpcliService {
 
     try {
       const { stdout, stderr } = await execAsync(
-        `docker exec ${containerName} wp ${command} --allow-root`,
+        `docker exec ${containerName} wp ${command}`,
       );
       if (stderr) {
         console.warn(`WP-CLI stderr: ${stderr}`);
@@ -70,18 +70,22 @@ export class wpcliService {
     }
   }
 
-  async wpGetMaintenanceStatus(setupId:number,userId: number): Promise<string> {
-    return this.execWpCli(setupId,userId, `maintenance-mode status`);
+ async wpGetMaintenanceStatus(setupId:number) {
+    const setup = await this.setupService.findOne(setupId)
+    const command = 'wp maintenance-mode status --allow-root'
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command)
+    
     
   }
+
 
   async wpMaintenance(
     setupId: number,
     mode: 'enable' | 'disable',
   ) {
     const fullCommand = mode === 'enable' 
-    ? 'wp maintenance-mode activate' 
-    : 'wp maintenance-mode deactivate';
+    ? 'wp maintenance-mode activate --allow-root' 
+    : 'wp maintenance-mode deactivate --allow-root';
   
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {
@@ -213,9 +217,12 @@ export class wpcliService {
     }
     return this.execWpCli(setupId,userId, `plugin update ${plugin}`);
   }
-  async wpUserList(setupId:number,userId: number, search?: string): Promise<any> {
-    const command = 'user list --format=json --fields=ID,first_name,last_name,user_email,roles';
-    const output = await this.execWpCli(setupId,userId, command);
+  async wpUserList(setupId:number, search?: string): Promise<any> {
+
+    const setup = await this.setupService.findOne(setupId)
+
+    const command = 'wp user list --format=json --fields=ID,first_name,last_name,user_email,roles --allow-root';
+    const output = await this.setupService.runKubectlCommand(setup.nameSpace,setup.podName, command);
     const wpUsers = JSON.parse(output);
 
     await this.wpUserRepository.saveWpUsers(wpUsers, setupId)
@@ -236,63 +243,69 @@ export class wpcliService {
   }
 
   async wpUserRoleUpdate(
-    setupId:number,
+    setupId: number,
     userId: number,
-    targetUserId: number,
     role: string,
-  ): Promise<string> {
-    const user = await this.execWpCli(setupId,userId, `user get ${targetUserId}`);
-    if (!user) {
-      throw new NotFoundException(
-        `User with ID ${targetUserId} not found in WordPress`,
-      );
+  ): Promise<any> {
+    const setup = await this.setupService.findOne(setupId);
+  
+    if (!setup) {
+      throw new NotFoundException(`Setup with ID ${setupId} not found`);
     }
+  
+    const fullCommand = `wp user get ${userId} --fields=ID --allow-root`
 
-    await this.execWpCli(setupId,userId, `user update ${targetUserId} --role=${role}`);
-    return `User with ID ${targetUserId} role has been updated to ${role}`;
+    const user = await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      fullCommand
+    );
+  
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found in WordPress`);
+    }
+  
+    const command = `wp user set-role ${userId} ${role} --allow-root`;
+  
+    const result = await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      command
+    );
+  
+    return {
+      message: `User role updated successfully`,
+      result,
+    };
   }
+  
 
   async wpSearchReplace(
-    setupId:number,
-    userId: number,
+    setupId: number,
     search: string,
     replace: string,
     options: Record<string, any> = {},
-  ): Promise<string> {
-    const containerName = await this.getContainerName(setupId,userId);
-
+  ) {
     const args: string[] = ['search-replace', search, replace];
-
+  
     if (options.tables) {
       args.push(...options.tables);
     }
-
+  
     for (const [key, value] of Object.entries(options)) {
       if (key === 'tables') continue;
-
+  
       if (typeof value === 'boolean') {
         if (value) args.push(`--${key}`);
       } else if (value !== undefined) {
         args.push(`--${key}=${value}`);
       }
     }
-
-    const escapedCommand = shellEscape(args);
-
-    try {
-      const { stdout, stderr } = await execAsync(
-        `docker exec ${containerName} wp ${escapedCommand} --allow-root`,
-      );
-
-      if (stderr) {
-        console.warn(`WP-CLI stderr: ${stderr}`);
-      }
-
-      return stdout.trim();
-    } catch (error) {
-      console.error(`Command execution failed: ${error.message}`);
-      throw new Error(error.message);
-    }
+  
+    const setup = await this.setupService.findOne(setupId);
+    const command = `wp search-replace ${args.join(' ')} --allow-root`;
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
 
   async wpCoreCheckUpdate(setupId:number,userId: number): Promise<any> {
@@ -313,10 +326,14 @@ export class wpcliService {
     return JSON.parse(output);
   }
 
-  async wpRoleList(setupId:number,userId: number): Promise<any> {
-    const output = await this.execWpCli(setupId,userId, 'role list --format=json');
-    return JSON.parse(output);
+  async wpRoles(setupId: number): Promise<any> {
+    const setup = await this.setupService.findOne(setupId);
+  
+    const command = 'wp role list --allow-root';
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
+  
 
   async wpCoreVersion(setupId:number,userId: number): Promise<object> {
     const output = await this.execWpCli(setupId,userId, 'core version');

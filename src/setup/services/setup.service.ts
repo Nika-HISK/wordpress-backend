@@ -18,7 +18,7 @@ export class SetupService {
   ) {}
 
   async runKubectlCommand(namespace: string, podName: string, command: string) {
-    const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -- ${command} --allow-root`;
+    const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -- ${command}`;
     try {
       const { stdout, stderr } = await execAsync(kubectlCommand);
       if (stderr) {
