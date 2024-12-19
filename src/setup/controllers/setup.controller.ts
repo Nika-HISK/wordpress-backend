@@ -20,7 +20,7 @@ import { ExtendedRequest } from 'src/auth/dto/extended-request.interface';
 
 
 // @UseGuards(AuthGuard)
-@Controller('setup')
+@Controller('wordpress')
 export class SetupController {
   constructor(private readonly setupService: SetupService) {}
 
@@ -85,10 +85,5 @@ export class SetupController {
   @Get('wordpress/username')
   async findByusername(){
     return await this.setupService.findByusername()
-  }
-  @Roles(Role.USER)
-  @Delete('wordpress')
-  async deleteSetup(@Query('setupId') setupId: number): Promise<string> {
-    return this.setupService.deleteSetupById(setupId);
   }
 }

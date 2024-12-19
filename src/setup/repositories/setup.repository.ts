@@ -11,23 +11,30 @@ export class SetupRepository {
     private readonly setupRepository: Repository<Setup>,
   ) {}
 
-  async SaveUserWordpress(createSetupDto:CreateSetupDto,wordpressContainerName:string,instancePort:number,id:number,phpVersion:string, dbContainerName:string){
+  async SaveUserWordpress(
+    nameSpace:string,
+    createSetupDto: CreateSetupDto,
+    podName: string,
+    Port: number,
+    id: number,
+    phpVersion: string,
+  ): Promise<Setup> {
     const newSetup = new Setup();
-    newSetup.wpAdminUser = createSetupDto.wpAdminUser
-    newSetup.wpAdminEmail = createSetupDto.wpAdminEmail
-    newSetup.wpAdminPassword = createSetupDto.wpAdminPassword
-    newSetup.siteTitle = createSetupDto.siteTitle
-    newSetup.instancePort = instancePort
-    newSetup.wordpressContainerName = wordpressContainerName
-    newSetup.userId = id
-    newSetup.phpVersion = phpVersion
-    newSetup.dbContainerName = dbContainerName
-    this.setupRepository.save(newSetup);
+    newSetup.nameSpace = nameSpace
+    newSetup.wpAdminUser = createSetupDto.wpAdminUser;
+    newSetup.wpAdminEmail = createSetupDto.wpAdminEmail;
+    newSetup.wpAdminPassword = createSetupDto.wpAdminPassword;
+    newSetup.siteTitle = createSetupDto.siteTitle;
+    newSetup.port = Port;
+    newSetup.podName = podName;
+    newSetup.userId = id;
+    newSetup.phpVersion = phpVersion;
     
-  } 
+    return await this.setupRepository.save(newSetup);
+  }
 
   async findByPort(port: number): Promise<Setup | null> {
-    return await this.setupRepository.findOneBy({ instancePort: port });
+    return await this.setupRepository.findOneBy({ port: port });
   }
   
 
@@ -59,7 +66,7 @@ export class SetupRepository {
 
   async findByport(){
     const port = await this.setupRepository.find({
-      select:['instancePort']
+      select:['port']
     })
     return port
   }
