@@ -18,7 +18,6 @@ import { Role } from 'src/auth/guard/enum/role.enum';
 import { Throttle } from '@nestjs/throttler';
 import { ExtendedRequest } from 'src/auth/dto/extended-request.interface';
 
-
 // @UseGuards(AuthGuard)
 @Controller('wordpress')
 export class SetupController {
@@ -26,34 +25,20 @@ export class SetupController {
 
   @Throttle({ default: { limit: 1, ttl: 2000 } })
   @Roles(Role.USER)
-  @Post('wordpress')
-  async setupWordpress(@Body() body: CreateSetupDto, @Req() req: ExtendedRequest) {
-    const userId = req.user.id
-    
-    try {      
-      
-      const generateInstanceId = (): string => {
-        const randomPart = require('crypto').randomBytes(8).toString('hex');
-        const timestampPart = Date.now().toString(36);
-        return `${randomPart}-${timestampPart}`;
-      };
-      const instanceId = generateInstanceId();
-        await this.setupService.setupWordpress(
-        body,
-        instanceId,
-        userId
-      );
-     
-    } catch (error) {
-
-    }
+  @Post('setup')
+  async setupWordpress(@Body() body: CreateSetupDto, @Req() req: any) {
+    const userId = req.user.id;
+    const response = await this.setupService.setupWordPress(body, userId);
+    return {
+      message: 'WordPress setup initiated successfully',
+      data: response,
+    };
   }
-
 
   @Roles(Role.USER)
   @Get('wordpress')
   async findAll() {
-    return await this.setupService.findAll()
+    return await this.setupService.findAll();
   }
 
   @Roles(Role.USER)
@@ -63,27 +48,20 @@ export class SetupController {
   }
 
   @Roles(Role.USER)
-  @Delete('/wordpress/:id')
-  async remove(@Param('id') id: string) {
-    return await this.setupService.deleteWordpress(Number(id));
-  }
-
-
-  @Roles(Role.USER)
   @Get('sitetitle')
   async findBytitle() {
-    return await this.setupService.findByTitle()
+    return await this.setupService.findByTitle();
   }
-  
+
   @Roles(Role.USER)
   @Get('wordpress/port')
-  async findByport(){
-    return await this.setupService.findByport()
+  async findByport() {
+    return await this.setupService.findByport();
   }
 
   @Roles(Role.USER)
   @Get('wordpress/username')
-  async findByusername(){
-    return await this.setupService.findByusername()
+  async findByusername() {
+    return await this.setupService.findByusername();
   }
 }

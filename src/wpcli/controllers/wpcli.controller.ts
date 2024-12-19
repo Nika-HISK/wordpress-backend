@@ -3,6 +3,7 @@ import { wpcliService } from '../services/wpcli.service';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
 import shellEscape from 'shell-escape';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('WP CLI')
 @ApiBearerAuth()
@@ -10,19 +11,6 @@ import shellEscape from 'shell-escape';
 export class wpcliController {
   constructor(private readonly wpCliService: wpcliService) {}
 
-  @Post('cache/add/:setupId')
-  async wpCacheAdd(
-    @Param('setupId') setupId: number,
-    @Req() req: any,
-    @Body('key') key: string,
-    @Body('data') data: string,
-    @Body('group') group: string,
-  ) {
-    const { key, data, group } = body;
-    const userId = req.user.id;
-    const setupId = params.setupId;
-    return this.wpCliService.wpCacheAdd(setupId, userId, key, data, group);
-  }
 
   @Roles(Role.USER)
   @Get('maintenance/status/:setupId')
@@ -50,16 +38,13 @@ export class wpcliController {
   }
 
   @Roles(Role.USER)
-  @Post('search-replace/:setupId')
+  @Post('search-replace')
   async wpSearchReplace(
-    @Param('setupId') setupId: number,
+    @Query('setupId') setupId: number,
     @Body('search') search: string,
     @Body('replace') replace: string,
     @Body('options') options: Record<string, any>,
   ) {
-    const userId = req.user.id;
-    const { setupId } = params;
-    const { search, replace, options } = body;
     try {
       const result = await this.wpCliService.wpSearchReplace(setupId,
         search,
