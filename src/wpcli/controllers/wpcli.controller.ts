@@ -80,7 +80,7 @@ export class wpcliController {
   }
 
   @Roles(Role.USER)
-  @Put('theme')
+  @Patch('theme')
   async wpThemeActivate(@Query('setupId') setupId: number,@Body('theme') theme: string) {
     return this.wpCliService.wpThemeActivate(setupId,theme);
   }
@@ -92,7 +92,7 @@ export class wpcliController {
   }
 
   @Roles(Role.USER)
-  @Patch('theme')
+  @Put('theme')
   async wpThemeUpdate(@Query('setupId') setupId: number, @Body('theme') theme: string) {
     return this.wpCliService.wpThemeUpdate(setupId,theme);
   }
@@ -104,13 +104,13 @@ export class wpcliController {
   }
 
   @Roles(Role.USER)
-  @Put('plugin/enable')
+  @Patch('plugin/enable')
   async wpPluginActivate(@Query('setupId') setupId: number,@Body('plugin') plugin: string) {
     return this.wpCliService.wpPluginActivate(setupId,plugin);
   }
 
   @Roles(Role.USER)
-  @Put('plugin/disable')
+  @Patch('plugin/disable')
   async wpPluginDeactivate(@Query('setupId') setupId: number,@Body('plugin') plugin: string) {
     return this.wpCliService.wpPluginDeactivate(setupId,plugin);
   }
@@ -122,7 +122,7 @@ export class wpcliController {
   }
 
   @Roles(Role.USER)
-  @Patch('plugin')
+  @Put('plugin')
   async wpPluginUpdate(@Query('setupId') setupId: number,@Body('plugin') plugin: string) {
     return this.wpCliService.wpPluginUpdate(setupId,plugin);
   }

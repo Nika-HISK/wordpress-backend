@@ -108,7 +108,7 @@ export class wpcliService {
     setupId: number,
     search?: string
   ): Promise<any> {
-    const command = 'wp theme list --format=json';
+    const command = 'wp theme list --format=json --allow-root';
   
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {

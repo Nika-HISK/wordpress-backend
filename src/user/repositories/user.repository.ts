@@ -26,10 +26,11 @@ export class UserRepository {
         'user.lastName',
         'user.email',
         'setup.id',
-        'setup.containerName',
+        'setup.podName',
         'setup.phpVersion',
-        'setup.instancePort',
+        'setup.port',
         'setup.siteTitle',
+        'setup.nameSpace'
       ])
       .getOne();
     }
