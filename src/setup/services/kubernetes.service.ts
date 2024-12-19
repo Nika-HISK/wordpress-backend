@@ -89,4 +89,21 @@ export class KubernetesService {
       throw error;
     }
   }
+  async findPodByLabel(namespace: string, labelKey: string, labelValue: string): Promise<string> {
+    try {
+      const { body } = await this.coreApi.listNamespacedPod(namespace, undefined, undefined, undefined, undefined, `${labelKey}=${labelValue}`);
+      if (body.items.length === 0) {
+        throw new Error(`No pod found with label ${labelKey}=${labelValue} in namespace ${namespace}`);
+      }
+      const podName = body.items[0].metadata?.name;
+      
+      if (!podName) {
+        throw new Error(`Pod metadata.name not found for label ${labelKey}=${labelValue}`);
+      }
+      return podName;
+    } catch (error) {
+      this.logger.error(`Error finding pod by label: ${error.message}`);
+      throw error;
+    }
+  }
 }

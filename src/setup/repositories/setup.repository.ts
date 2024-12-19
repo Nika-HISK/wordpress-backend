@@ -12,19 +12,21 @@ export class SetupRepository {
   ) {}
 
   async SaveUserWordpress(
+    nameSpace:string,
     createSetupDto: CreateSetupDto,
-    wordpressContainerName: string,
+    podName: string,
     instancePort: number,
     id: number,
     phpVersion: string,
   ): Promise<Setup> {
     const newSetup = new Setup();
+    newSetup.nameSpace = nameSpace
     newSetup.wpAdminUser = createSetupDto.wpAdminUser;
     newSetup.wpAdminEmail = createSetupDto.wpAdminEmail;
     newSetup.wpAdminPassword = createSetupDto.wpAdminPassword;
     newSetup.siteTitle = createSetupDto.siteTitle;
     newSetup.instancePort = instancePort;
-    newSetup.containerName = wordpressContainerName;
+    newSetup.podName = podName;
     newSetup.userId = id;
     newSetup.phpVersion = phpVersion;
     

@@ -20,7 +20,10 @@ export class Setup extends baseEntity {
   siteTitle: string;
 
   @Column({unique:true})
-  containerName: string;
+  podName: string;
+
+  @Column()
+  nameSpace:string
 
   @Column()
   phpVersion:string

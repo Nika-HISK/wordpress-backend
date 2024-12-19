@@ -34,7 +34,7 @@ export class wpcliService {
   ): Promise<string> {
     const setup = await this.setupRepository.findOne({
       where: { id: setupId, userId },
-      select: ['containerName'],
+      select: ['podName'],
     });
 
     if (!setup) {
@@ -43,7 +43,7 @@ export class wpcliService {
       );
     }
 
-    return setup.containerName;
+    return setup.podName;
   }
 
 
