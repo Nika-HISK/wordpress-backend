@@ -17,11 +17,15 @@ import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
 import { Throttle } from '@nestjs/throttler';
 import { ExtendedRequest } from 'src/auth/dto/extended-request.interface';
+import { KubernetesService } from '../services/kubernetes.service';
 
 // @UseGuards(AuthGuard)
 @Controller('wordpress')
 export class SetupController {
-  constructor(private readonly setupService: SetupService) {}
+  constructor(
+    private readonly setupService: SetupService,
+    private readonly k8sService: KubernetesService,
+  ) {}
 
   @Throttle({ default: { limit: 1, ttl: 2000 } })
   @Roles(Role.USER)
@@ -33,6 +37,12 @@ export class SetupController {
       message: 'WordPress setup initiated successfully',
       data: response,
     };
+  }
+
+  @Roles(Role.USER)
+  @Get('metrics/:namespace/:podName')
+  async getPodMetrics(@Param('namespace') namespace: string, @Param('podName') podName: string) {
+    return await this.k8sService.getPodMetrics(namespace, podName);
   }
 
   @Roles(Role.USER)

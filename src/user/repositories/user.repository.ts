@@ -30,7 +30,8 @@ export class UserRepository {
         'setup.phpVersion',
         'setup.port',
         'setup.siteTitle',
-        'setup.nameSpace'
+        'setup.nameSpace',
+        'setup.wpVersion'
       ])
       .getOne();
     }

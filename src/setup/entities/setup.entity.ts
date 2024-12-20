@@ -29,6 +29,9 @@ export class Setup extends baseEntity {
   phpVersion:string
 
   @Column()
+  wpVersion:string
+
+  @Column()
   port:number
 
   @Column()

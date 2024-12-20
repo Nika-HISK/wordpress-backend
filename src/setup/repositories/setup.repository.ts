@@ -12,15 +12,16 @@ export class SetupRepository {
   ) {}
 
   async SaveUserWordpress(
-    nameSpace:string,
+    nameSpace: string,
     createSetupDto: CreateSetupDto,
     podName: string,
     Port: number,
     id: number,
     phpVersion: string,
+    wpVersion: string,
   ): Promise<Setup> {
     const newSetup = new Setup();
-    newSetup.nameSpace = nameSpace
+    newSetup.nameSpace = nameSpace;
     newSetup.wpAdminUser = createSetupDto.wpAdminUser;
     newSetup.wpAdminEmail = createSetupDto.wpAdminEmail;
     newSetup.wpAdminPassword = createSetupDto.wpAdminPassword;
@@ -29,54 +30,50 @@ export class SetupRepository {
     newSetup.podName = podName;
     newSetup.userId = id;
     newSetup.phpVersion = phpVersion;
-    
+    newSetup.wpVersion = wpVersion
+
     return await this.setupRepository.save(newSetup);
   }
 
   async findByPort(port: number): Promise<Setup | null> {
     return await this.setupRepository.findOneBy({ port: port });
   }
-  
 
-  async deleteUser(id:number) {
-    return await this.setupRepository.softDelete(id)
+  async deleteUser(id: number) {
+    return await this.setupRepository.softDelete(id);
   }
 
   async findAll() {
-    return await this.setupRepository.find()
+    return await this.setupRepository.find();
   }
 
   async findByTitle() {
     const sites = await this.setupRepository.find({
-      select: ['siteTitle'], 
+      select: ['siteTitle'],
     });
-  
+
     return sites;
   }
-
 
   async deleteSetup(id: number): Promise<void> {
     await this.setupRepository.softDelete(id);
   }
 
-
-   async findOne(id:number) {
-    return await this.setupRepository.findOneBy({id})
+  async findOne(id: number) {
+    return await this.setupRepository.findOneBy({ id });
   }
 
-  async findByport(){
+  async findByport() {
     const port = await this.setupRepository.find({
-      select:['port']
-    })
-    return port
+      select: ['port'],
+    });
+    return port;
   }
-  
-  async findByusername(){
-    const username = await this.setupRepository.find({
-      select:['wpAdminUser']
-    })
-    return username
-  }
-  
 
+  async findByusername() {
+    const username = await this.setupRepository.find({
+      select: ['wpAdminUser'],
+    });
+    return username;
+  }
 }

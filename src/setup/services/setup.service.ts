@@ -37,9 +37,8 @@ export class SetupService {
     const mysqlPassword = crypto.randomBytes(8).toString('hex');
     const siteTitle = createSetupDto.siteTitle || 'My WordPress Site';
     const wpAdminUser = createSetupDto.wpAdminUser || 'admin';
-    const wpAdminEmail = createSetupDto.wpAdminEmail || 'example@example.com'
+    const wpAdminEmail = createSetupDto.wpAdminEmail || 'example@example.com';
     const wpAdminPassword = createSetupDto.wpAdminPassword || 'password123';
-
 
     // Step 1: Create Namespace
     await this.k8sService.createNamespace(namespace);
@@ -111,9 +110,16 @@ export class SetupService {
       metadata: { name: `wordpress-${instanceId}`, namespace },
       spec: {
         replicas: 1,
-        selector: { matchLabels: { app: `wordpress-${instanceId}`, 'unique-id': uniqueId } },
+        selector: {
+          matchLabels: {
+            app: `wordpress-${instanceId}`,
+            'unique-id': uniqueId,
+          },
+        },
         template: {
-          metadata: { labels: { app: `wordpress-${instanceId}`, 'unique-id': uniqueId } },
+          metadata: {
+            labels: { app: `wordpress-${instanceId}`, 'unique-id': uniqueId },
+          },
           spec: {
             containers: [
               {
@@ -121,7 +127,10 @@ export class SetupService {
                 image: 'wordpress:latest',
                 ports: [{ containerPort: 80 }],
                 env: [
-                  { name: 'WORDPRESS_DB_HOST', value: `mysql-${instanceId}:3306` },
+                  {
+                    name: 'WORDPRESS_DB_HOST',
+                    value: `mysql-${instanceId}:3306`,
+                  },
                   { name: 'WORDPRESS_DB_NAME', value: 'wordpress' },
                   { name: 'WORDPRESS_DB_USER', value: 'root' },
                   {
@@ -147,9 +156,7 @@ export class SetupService {
       kind: 'Service',
       metadata: { name: `wordpress-${instanceId}`, namespace },
       spec: {
-        ports: [
-          { protocol: 'TCP', port: 8081, targetPort: 80 },
-        ],
+        ports: [{ protocol: 'TCP', port: 8081, targetPort: 80 }],
         selector: { app: `wordpress-${instanceId}` },
         type: 'LoadBalancer', // Expose WordPress via LoadBalancer
       },
@@ -157,8 +164,12 @@ export class SetupService {
     await this.k8sService.applyManifest(namespace, wordpressServiceManifest);
 
     // Step 5: Save Pod Name in the Database
-    const podName = await this.k8sService.findPodByLabel(namespace, 'unique-id', uniqueId);
-    
+    const podName = await this.k8sService.findPodByLabel(
+      namespace,
+      'unique-id',
+      uniqueId,
+    );
+
     await new Promise((resolve) => setTimeout(resolve, 3000));
     await this.runKubectlCommand(namespace, podName, 'apt-get update');
     await this.runKubectlCommand(namespace, podName, 'apt-get install -y curl');
@@ -168,7 +179,11 @@ export class SetupService {
       'curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar',
     );
     await this.runKubectlCommand(namespace, podName, 'chmod +x wp-cli.phar');
-    await this.runKubectlCommand(namespace, podName, 'mv wp-cli.phar /usr/local/bin/wp');
+    await this.runKubectlCommand(
+      namespace,
+      podName,
+      'mv wp-cli.phar /usr/local/bin/wp',
+    );
     console.log('WP-CLI installed.');
 
     // Wait for a moment before proceeding
@@ -176,7 +191,11 @@ export class SetupService {
 
     // Check if wp-config.php exists
     try {
-      await this.runKubectlCommand(namespace, podName, 'ls /var/www/html/wp-config.php');
+      await this.runKubectlCommand(
+        namespace,
+        podName,
+        'ls /var/www/html/wp-config.php',
+      );
       console.log('wp-config.php exists. Skipping removal.');
     } catch {
       console.log('wp-config.php does not exist. Proceeding with creation...');
@@ -187,8 +206,13 @@ export class SetupService {
       );
       console.log('wp-config.php created.');
     }
-    const wordpressService = await this.k8sService.getService(namespace, `wordpress-${instanceId}`);
-    const nodePort = wordpressService.spec.ports.find(port => port.port === 8081)?.nodePort;
+    const wordpressService = await this.k8sService.getService(
+      namespace,
+      `wordpress-${instanceId}`,
+    );
+    const nodePort = wordpressService.spec.ports.find(
+      (port) => port.port === 8081,
+    )?.nodePort;
 
     // Install WordPress
     console.log('Installing WordPress...');
@@ -201,18 +225,47 @@ export class SetupService {
 
     // Activate necessary plugins
     console.log('Activating WordPress plugins...');
-    await this.runKubectlCommand(namespace, podName, 'wp plugin install wordpress-importer --activate --allow-root');
-    await this.runKubectlCommand(namespace, podName, 'wp theme activate twentytwentyfour --allow-root')
+    await this.runKubectlCommand(
+      namespace,
+      podName,
+      'wp plugin install wordpress-importer --activate --allow-root',
+    );
+    await this.runKubectlCommand(
+      namespace,
+      podName,
+      'wp theme activate twentytwentyfour --allow-root',
+    );
 
     // Set file permissions
     console.log('Setting file permissions...');
     try {
-      await this.runKubectlCommand(namespace, podName, 'chown -R www-data:www-data /var/www/html');
+      await this.runKubectlCommand(
+        namespace,
+        podName,
+        'chown -R www-data:www-data /var/www/html',
+      );
     } catch {
-      console.log('Error setting file permissions: Read-only file system. Skipping chown.');
+      console.log(
+        'Error setting file permissions: Read-only file system. Skipping chown.',
+      );
     }
 
-    
+    // Get PHP version
+    const phpVersionOutput = await this.runKubectlCommand(
+      namespace,
+      podName,
+      'wp --info --format=json --allow-root',
+    );
+    const phpVersionInfo = JSON.parse(phpVersionOutput);
+    const phpVersion = phpVersionInfo.php_version;
+
+    // Get WordPress version
+    const wpVersionOutput = await this.runKubectlCommand(
+      namespace,
+      podName,
+      'wp core version --allow-root',
+    );
+    const wpVersion = wpVersionOutput.trim();
 
     await this.setupRepository.SaveUserWordpress(
       namespace,
@@ -220,7 +273,8 @@ export class SetupService {
       podName,
       nodePort,
       userId,
-      '8.0',
+      phpVersion,
+      wpVersion
     );
 
     // Retrieve NodePort for WordPress (if exposed as LoadBalancer)
@@ -230,7 +284,6 @@ export class SetupService {
       wordpressUrl: `http://49.12.148.222:${nodePort}`, // Replace <node-ip> with your cluster's node IP
     };
   }
-
 
   async findAll() {
     return await this.setupRepository.findAll();

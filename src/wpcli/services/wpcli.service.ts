@@ -49,27 +49,6 @@ export class wpcliService {
   }
 
 
-  private async execWpCli(
-    setupId: number,
-    userId: number,
-    command: string,
-  ): Promise<string> {
-    const containerName = await this.getContainerName(setupId, userId);
-
-    try {
-      const { stdout, stderr } = await execAsync(
-        `docker exec ${containerName} wp ${command}`,
-      );
-      if (stderr) {
-        console.warn(`WP-CLI stderr: ${stderr}`);
-      }
-      return stdout.trim();
-    } catch (error) {
-      console.error(`Command execution failed: ${error.message}`);
-      throw new Error(error.message);
-    }
-  }
-
  async wpGetMaintenanceStatus(setupId:number) {
     const setup = await this.setupService.findOne(setupId)
     const command = 'wp maintenance-mode status --allow-root'
@@ -96,15 +75,6 @@ export class wpcliService {
   }
   
 
-  async wpCacheAdd(
-    setupId:number,
-    userId: number,
-    key: string,
-    data: string,
-    group: string,
-  ): Promise<string> {
-    return this.execWpCli(setupId,userId, `cache add ${key} "${data}" ${group}`);
-  }
 
 
 
@@ -411,18 +381,25 @@ export class wpcliService {
   async wpRoles(setupId: number): Promise<any> {
     const setup = await this.setupService.findOne(setupId);
   
-    const command = 'wp role list --allow-root';
+    const command = 'wp role list --format=json --allow-root';
   
     return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
   
 
-  async wpCoreVersion(setupId:number,userId: number): Promise<object> {
-    const output = await this.execWpCli(setupId,userId, 'core version');
-    const version = {version:output}
-    return version
+  async wpCoreVersion(setupId: number): Promise<object> {
+    const command = 'wp core version --allow-root';
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    const output = await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
+    const version = { version: output.trim() };
+  
+    return version;
   }
-
   async wpGetPhpVersion(setupId: number): Promise<object> {
     const command = 'wp --info --format=json --allow-root';
   
