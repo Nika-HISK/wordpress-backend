@@ -15,6 +15,7 @@ export class KubernetesService {
   private appsApi: AppsV1Api;
   private networkingApi: NetworkingV1Api;
   private visitCounts: Record<string, number> = {};
+  private appsV1Api: AppsV1Api;
 
   constructor() {
     this.kubeConfig = new KubeConfig();
@@ -191,6 +192,18 @@ export class KubernetesService {
       };
     } catch (error) {
       this.logger.error(`Error fetching metrics for pod "${podName}" in namespace "${namespace}": ${error.message}`);
+      throw error;
+    }
+  }
+
+  async listReplicaSets(namespace: string) {
+    try {
+      const response = await this.appsApi.listNamespacedReplicaSet(namespace);
+      return response.body.items;
+    } catch (error) {
+      this.logger.error(
+        `Failed to list ReplicaSets in namespace "${namespace}": ${error.message}`,
+      );
       throw error;
     }
   }
