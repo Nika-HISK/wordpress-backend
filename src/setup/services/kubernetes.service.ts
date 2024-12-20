@@ -14,6 +14,7 @@ export class KubernetesService {
   private coreApi: CoreV1Api;
   private appsApi: AppsV1Api;
   private networkingApi: NetworkingV1Api;
+  private visitCounts: Record<string, number> = {};
 
   constructor() {
     this.kubeConfig = new KubeConfig();
@@ -21,6 +22,7 @@ export class KubernetesService {
     this.coreApi = this.kubeConfig.makeApiClient(CoreV1Api);
     this.appsApi = this.kubeConfig.makeApiClient(AppsV1Api);
     this.networkingApi = this.kubeConfig.makeApiClient(NetworkingV1Api);
+    this.appsV1Api = this.kubeConfig.makeApiClient(AppsV1Api);
   }
 
   async createNamespace(namespaceName: string): Promise<void> {
@@ -192,4 +194,5 @@ export class KubernetesService {
       throw error;
     }
   }
+  
 }
