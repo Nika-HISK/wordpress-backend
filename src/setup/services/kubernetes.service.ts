@@ -15,6 +15,7 @@ export class KubernetesService {
   private appsApi: AppsV1Api;
   private networkingApi: NetworkingV1Api;
   private visitCounts: Record<string, number> = {};
+  private appsV1Api: AppsV1Api;
 
   constructor() {
     this.kubeConfig = new KubeConfig();
@@ -22,6 +23,7 @@ export class KubernetesService {
     this.coreApi = this.kubeConfig.makeApiClient(CoreV1Api);
     this.appsApi = this.kubeConfig.makeApiClient(AppsV1Api);
     this.networkingApi = this.kubeConfig.makeApiClient(NetworkingV1Api);
+    this.appsV1Api = this.kubeConfig.makeApiClient(AppsV1Api);
   }
 
   async createNamespace(namespaceName: string): Promise<void> {
@@ -185,5 +187,19 @@ export class KubernetesService {
       throw error;
     }
   }
+
+  async listReplicaSets(namespace: string) {
+    try {
+      const response = await this.appsApi.listNamespacedReplicaSet(namespace);
+      return response.body.items;
+    } catch (error) {
+      this.logger.error(
+        `Failed to list ReplicaSets in namespace "${namespace}": ${error.message}`,
+      );
+      throw error;
+    }
+  }
+  
+  
   
 }

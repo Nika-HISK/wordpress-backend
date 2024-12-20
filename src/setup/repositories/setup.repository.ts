@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Setup } from '../entities/setup.entity';
 import { Repository } from 'typeorm';
 import { CreateSetupDto } from '../dto/create-setup.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class SetupRepository {
@@ -19,18 +20,34 @@ export class SetupRepository {
     id: number,
     phpVersion: string,
     wpVersion: string,
+    sqlPodName: string,
+    wpDeployment: string,
+    sqlDeployment: string,
+    wpReplicaSet: string,
+    sqlReplicaSet: string
+
   ): Promise<Setup> {
+
+    let hashedPassword = await bcrypt.hash(createSetupDto.wpAdminPassword, 10);
+
+    
     const newSetup = new Setup();
     newSetup.nameSpace = nameSpace;
     newSetup.wpAdminUser = createSetupDto.wpAdminUser;
     newSetup.wpAdminEmail = createSetupDto.wpAdminEmail;
-    newSetup.wpAdminPassword = createSetupDto.wpAdminPassword;
+    newSetup.wpAdminPassword = hashedPassword;
     newSetup.siteTitle = createSetupDto.siteTitle;
     newSetup.port = Port;
     newSetup.podName = podName;
     newSetup.userId = id;
     newSetup.phpVersion = phpVersion;
-    newSetup.wpVersion = wpVersion
+    newSetup.wpVersion = wpVersion;
+    newSetup.sqlPodName = sqlPodName;
+    newSetup.wpDeployment = wpDeployment;
+    newSetup.sqlDeployment = sqlDeployment;
+    newSetup.wpReplicaSet = wpReplicaSet;
+    newSetup.sqlReplicaSet = sqlReplicaSet;
+
 
     return await this.setupRepository.save(newSetup);
   }
@@ -55,9 +72,11 @@ export class SetupRepository {
     return sites;
   }
 
-  async deleteSetup(id: number): Promise<void> {
-    await this.setupRepository.softDelete(id);
+  async deleteSetup(id: number) {
+    return await this.setupRepository.softDelete(id);
   }
+
+
 
   async findOne(id: number) {
     return await this.setupRepository.findOneBy({ id });

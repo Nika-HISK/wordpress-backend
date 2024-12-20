@@ -35,6 +35,21 @@ export class Setup extends baseEntity {
   port:number
 
   @Column()
+  sqlPodName:string
+
+  @Column()
+  wpDeployment:string
+
+  @Column()
+  sqlDeployment:string
+
+  @Column()
+  wpReplicaSet:string
+
+  @Column()
+  sqlReplicaSet:string
+
+  @Column()
   userId:number
 
   @ManyToOne(() => User, (user) => user.setup)

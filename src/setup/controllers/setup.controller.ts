@@ -10,6 +10,7 @@ import {
   Req,
   UseGuards,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupService } from '../services/setup.service';
@@ -39,6 +40,23 @@ export class SetupController {
     };
   }
 
+  @Throttle({ default: { limit: 1, ttl: 2000 } })
+  @Roles(Role.USER)
+  @Post('resetSetup/:id')
+  async resetSetup(
+      @Body('wpAdminPassword') wpAdminPassword: string, 
+      @Req() req: any, 
+      @Param('id') setupId: string
+  ) {
+      if (!wpAdminPassword || typeof wpAdminPassword !== 'string') {
+          throw new BadRequestException('Invalid wpAdminPassword: Must be a non-empty string.');
+      }
+  
+      return await this.setupService.resetSetup(wpAdminPassword, req.user.id, Number(setupId));
+  }
+  
+  
+
   @Roles(Role.USER)
   @Get('metrics/:namespace/:podName')
   async getPodMetrics(@Param('namespace') namespace: string, @Param('podName') podName: string) {
@@ -55,6 +73,12 @@ export class SetupController {
   @Get('/wordpress:id')
   async findOne(@Param('id') id: string) {
     return await this.setupService.findOne(Number(id));
+  }
+
+  @Roles(Role.USER)
+  @Delete('/setup/:id')
+  async deleteSetup(@Param('id') id: string) {
+    return await this.setupService.deleteSetup(Number(id))
   }
 
   @Roles(Role.USER)

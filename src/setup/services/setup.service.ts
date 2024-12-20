@@ -267,6 +267,22 @@ export class SetupService {
     );
     const wpVersion = wpVersionOutput.trim();
 
+    const sqlPodName = await this.k8sService.findPodByLabel(namespace, 'app', `mysql-${instanceId}`);
+    const wpDeployment = `wordpress-${instanceId}`;
+    const sqlDeployment = `mysql-${instanceId}`
+    const replicaSets = await this.k8sService.listReplicaSets(namespace);
+    const wpReplicaSet = replicaSets.find(rs =>
+      rs.metadata?.ownerReferences?.some(owner => owner.name === wpDeployment)
+    )?.metadata?.name;
+    
+    const sqlReplicaSet = replicaSets.find(rs =>
+      rs.metadata?.ownerReferences?.some(owner => owner.name === sqlDeployment)
+    )?.metadata?.name;
+
+    console.log(wpReplicaSet, sqlReplicaSet);
+    
+    
+
     await this.setupRepository.SaveUserWordpress(
       namespace,
       createSetupDto,
@@ -274,7 +290,12 @@ export class SetupService {
       nodePort,
       userId,
       phpVersion,
-      wpVersion
+      wpVersion,
+      sqlPodName,
+      wpDeployment,
+      sqlDeployment,
+      wpReplicaSet,
+      sqlReplicaSet
     );
 
     // Retrieve NodePort for WordPress (if exposed as LoadBalancer)
@@ -284,6 +305,44 @@ export class SetupService {
       wordpressUrl: `http://49.12.148.222:${nodePort}`, // Replace <node-ip> with your cluster's node IP
     };
   }
+
+  async deleteSetup(setupId:number) {
+    const setup = await this.findOne(setupId)
+    
+    await execAsync(`
+      kubectl delete deployment ${setup.wpDeployment} -n ${setup.nameSpace}
+    `)
+    await execAsync(`
+    kubectl delete deployment ${setup.sqlDeployment} -n ${setup.nameSpace}
+  `)
+    return await this.setupRepository.deleteSetup(setupId)
+  }
+
+  async resetSetup(wpAdminPassword: string, userId: number, setupId: number) {
+    const setup = await this.findOne(setupId)
+
+    console.log(setup);
+    
+
+    const createSetupDto ={
+      wpAdminUser: setup.wpAdminUser,
+      wpAdminPassword: wpAdminPassword,
+      wpAdminEmail: setup.wpAdminEmail,
+      siteTitle: setup.siteTitle
+      
+    }
+
+    await this.deleteSetup(setupId)
+    setTimeout(() => {
+      console.log('This will run after 10 seconds');
+  }, 50000);
+
+    const newSetup = await this.setupWordPress(createSetupDto, userId)
+
+    return `succsesfully reseted on port ${newSetup.wordpressUrl}`
+  }
+
+  
 
   async findAll() {
     return await this.setupRepository.findAll();
