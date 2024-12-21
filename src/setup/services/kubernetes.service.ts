@@ -207,5 +207,37 @@ export class KubernetesService {
       throw error;
     }
   }
+
+  async getNodeInternalIpForPod(podName: string, namespace: string): Promise<string> {
+    try {
+      // Step 1: Get pod details
+      console.log(`Fetching details for pod: ${podName} in namespace: ${namespace}`);
+      const podResponse = await this.coreApi.readNamespacedPod(podName, namespace);
+      const pod = podResponse.body;
+      const nodeName = pod.spec?.nodeName;
+
+      if (!nodeName) {
+        console.error(`Node name not found for pod ${podName}`);
+        throw new Error(`Node name not found for pod ${podName}`);
+      }
+
+      // Step 2: Get node details
+      console.log(`Fetching details for node: ${nodeName}`);
+      const nodeResponse = await this.coreApi.readNode(nodeName);
+      const node = nodeResponse.body;
+      const internalIp = node.status?.addresses?.find((addr) => addr.type === 'InternalIP')?.address;
+
+      if (!internalIp) {
+        console.error(`Internal IP not found for node ${nodeName}`);
+        throw new Error(`Internal IP not found for node ${nodeName}`);
+      }
+
+      console.log(`Internal IP for node ${nodeName}: ${internalIp}`);
+      return internalIp;
+    } catch (error) {
+      console.error(`Error fetching internal IP for pod ${podName}: ${error.message}`);
+      throw error;
+    }
+  }
   
 }

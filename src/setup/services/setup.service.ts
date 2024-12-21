@@ -278,6 +278,8 @@ export class SetupService {
     const sqlReplicaSet = replicaSets.find(rs =>
       rs.metadata?.ownerReferences?.some(owner => owner.name === sqlDeployment)
     )?.metadata?.name;
+    const nodeIp = await this.k8sService.getNodeInternalIpForPod(podName, namespace)
+    const fullIp = `${nodeIp}:${nodePort}`
 
     console.log(wpReplicaSet, sqlReplicaSet);
     
@@ -295,7 +297,9 @@ export class SetupService {
       wpDeployment,
       sqlDeployment,
       wpReplicaSet,
-      sqlReplicaSet
+      sqlReplicaSet,
+      nodeIp,
+      fullIp
     );
 
     // Retrieve NodePort for WordPress (if exposed as LoadBalancer)
