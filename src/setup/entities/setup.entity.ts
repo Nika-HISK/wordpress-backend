@@ -52,6 +52,12 @@ export class Setup extends baseEntity {
   @Column()
   userId:number
 
+  @Column()
+  nodeIp:string
+
+  @Column()
+  fullIp:string
+
   @ManyToOne(() => User, (user) => user.setup)
   @JoinColumn({ name: 'userId' }) 
   user: User;

@@ -24,7 +24,9 @@ export class SetupRepository {
     wpDeployment: string,
     sqlDeployment: string,
     wpReplicaSet: string,
-    sqlReplicaSet: string
+    sqlReplicaSet: string,
+    nodeIp: string,
+    fullIp: string
 
   ): Promise<Setup> {
 
@@ -47,7 +49,8 @@ export class SetupRepository {
     newSetup.sqlDeployment = sqlDeployment;
     newSetup.wpReplicaSet = wpReplicaSet;
     newSetup.sqlReplicaSet = sqlReplicaSet;
-
+    newSetup.nodeIp = nodeIp;
+    newSetup.fullIp = fullIp
 
     return await this.setupRepository.save(newSetup);
   }

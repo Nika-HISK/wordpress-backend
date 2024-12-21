@@ -31,7 +31,9 @@ export class UserRepository {
         'setup.port',
         'setup.siteTitle',
         'setup.nameSpace',
-        'setup.wpVersion'
+        'setup.wpVersion',
+        'setup.nodeIp',
+        'setup.fullIp'
       ])
       .getOne();
     }
