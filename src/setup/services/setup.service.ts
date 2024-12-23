@@ -103,6 +103,57 @@ export class SetupService {
     };
     await this.k8sService.applyManifest(namespace, mysqlServiceManifest);
 
+    const phpAdminDeploymentManifest = {
+      apiVersion: 'apps/v1',
+      kind: 'Deployment',
+      metadata: { name: `phpadmin-${instanceId}`, namespace },
+      spec: {
+        replicas: 1,
+        selector: { matchLabels: { app: `phpadmin-${instanceId}` } },
+        template: {
+          metadata: { labels: { app: `phpadmin-${instanceId}` } },
+          spec: {
+            containers: [
+              {
+                name: 'phpmyadmin',
+                image: 'phpmyadmin:latest',
+                ports: [{ containerPort: 80 }],
+                env: [
+                  {
+                    name: 'PMA_HOST',
+                    value: `mysql-${instanceId}`,
+                  },
+                  { name: 'PMA_USER', value: 'root' },
+                  {
+                    name: 'PMA_PASSWORD',
+                    valueFrom: {
+                      secretKeyRef: {
+                        name: `mysql-secret-${instanceId}`,
+                        key: 'MYSQL_ROOT_PASSWORD',
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    };
+    await this.k8sService.applyManifest(namespace, phpAdminDeploymentManifest);
+
+    const phpAdminServiceManifest = {
+      apiVersion: 'v1',
+      kind: 'Service',
+      metadata: { name: `phpadmin-${instanceId}`, namespace },
+      spec: {
+        ports: [{ protocol: 'TCP', port: 8080, targetPort: 80 }],
+        selector: { app: `phpadmin-${instanceId}` },
+        type: 'LoadBalancer',
+      },
+    };
+    await this.k8sService.applyManifest(namespace, phpAdminServiceManifest);
+
     // Step 4: Deploy WordPress
     const wordpressDeploymentManifest = {
       apiVersion: 'apps/v1',
@@ -235,6 +286,13 @@ export class SetupService {
       podName,
       'wp theme activate twentytwentyfour --allow-root',
     );
+    const output = await this.runKubectlCommand(
+      namespace,
+      podName,
+      'wp db size --format=json --allow-root',
+    );
+    const dbName = JSON.parse(output);
+    const readydbName = dbName[0].Name;
 
     // Set file permissions
     console.log('Setting file permissions...');
@@ -267,23 +325,32 @@ export class SetupService {
     );
     const wpVersion = wpVersionOutput.trim();
 
-    const sqlPodName = await this.k8sService.findPodByLabel(namespace, 'app', `mysql-${instanceId}`);
+    const sqlPodName = await this.k8sService.findPodByLabel(
+      namespace,
+      'app',
+      `mysql-${instanceId}`,
+    );
     const wpDeployment = `wordpress-${instanceId}`;
-    const sqlDeployment = `mysql-${instanceId}`
+    const sqlDeployment = `mysql-${instanceId}`;
     const replicaSets = await this.k8sService.listReplicaSets(namespace);
-    const wpReplicaSet = replicaSets.find(rs =>
-      rs.metadata?.ownerReferences?.some(owner => owner.name === wpDeployment)
+    const wpReplicaSet = replicaSets.find((rs) =>
+      rs.metadata?.ownerReferences?.some(
+        (owner) => owner.name === wpDeployment,
+      ),
     )?.metadata?.name;
-    
-    const sqlReplicaSet = replicaSets.find(rs =>
-      rs.metadata?.ownerReferences?.some(owner => owner.name === sqlDeployment)
+
+    const sqlReplicaSet = replicaSets.find((rs) =>
+      rs.metadata?.ownerReferences?.some(
+        (owner) => owner.name === sqlDeployment,
+      ),
     )?.metadata?.name;
-    const nodeIp = await this.k8sService.getNodeInternalIpForPod(podName, namespace)
-    const fullIp = `${nodeIp}:${nodePort}`
+    const nodeIp = await this.k8sService.getNodeInternalIpForPod(
+      podName,
+      namespace,
+    );
+    const fullIp = `${nodeIp}:${nodePort}`;
 
     console.log(wpReplicaSet, sqlReplicaSet);
-    
-    
 
     await this.setupRepository.SaveUserWordpress(
       namespace,
@@ -299,7 +366,8 @@ export class SetupService {
       wpReplicaSet,
       sqlReplicaSet,
       nodeIp,
-      fullIp
+      fullIp,
+      readydbName,
     );
 
     // Retrieve NodePort for WordPress (if exposed as LoadBalancer)
@@ -310,43 +378,39 @@ export class SetupService {
     };
   }
 
-  async deleteSetup(setupId:number) {
-    const setup = await this.findOne(setupId)
-    
+  async deleteSetup(setupId: number) {
+    const setup = await this.findOne(setupId);
+
     await execAsync(`
       kubectl delete deployment ${setup.wpDeployment} -n ${setup.nameSpace}
-    `)
+    `);
     await execAsync(`
     kubectl delete deployment ${setup.sqlDeployment} -n ${setup.nameSpace}
-  `)
-    return await this.setupRepository.deleteSetup(setupId)
+  `);
+    return await this.setupRepository.deleteSetup(setupId);
   }
 
   async resetSetup(wpAdminPassword: string, userId: number, setupId: number) {
-    const setup = await this.findOne(setupId)
+    const setup = await this.findOne(setupId);
 
     console.log(setup);
-    
 
-    const createSetupDto ={
+    const createSetupDto = {
       wpAdminUser: setup.wpAdminUser,
       wpAdminPassword: wpAdminPassword,
       wpAdminEmail: setup.wpAdminEmail,
-      siteTitle: setup.siteTitle
-      
-    }
+      siteTitle: setup.siteTitle,
+    };
 
-    await this.deleteSetup(setupId)
+    await this.deleteSetup(setupId);
     setTimeout(() => {
       console.log('This will run after 10 seconds');
-  }, 50000);
+    }, 50000);
 
-    const newSetup = await this.setupWordPress(createSetupDto, userId)
+    const newSetup = await this.setupWordPress(createSetupDto, userId);
 
-    return `succsesfully reseted on port ${newSetup.wordpressUrl}`
+    return `succsesfully reseted on port ${newSetup.wordpressUrl}`;
   }
-
-  
 
   async findAll() {
     return await this.setupRepository.findAll();

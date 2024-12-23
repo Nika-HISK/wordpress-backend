@@ -19,58 +19,61 @@ export class Setup extends baseEntity {
   @Column()
   siteTitle: string;
 
-  @Column({unique:true})
+  @Column({ unique: true })
   podName: string;
 
   @Column()
-  nameSpace:string
+  nameSpace: string;
 
   @Column()
-  phpVersion:string
+  phpVersion: string;
 
   @Column()
-  wpVersion:string
+  wpVersion: string;
 
   @Column()
-  port:number
+  port: number;
 
   @Column()
-  sqlPodName:string
+  sqlPodName: string;
 
   @Column()
-  wpDeployment:string
+  wpDeployment: string;
 
   @Column()
-  sqlDeployment:string
+  sqlDeployment: string;
 
   @Column()
-  wpReplicaSet:string
+  wpReplicaSet: string;
 
   @Column()
-  sqlReplicaSet:string
+  sqlReplicaSet: string;
 
   @Column()
-  userId:number
+  dbName: string;
 
   @Column()
-  nodeIp:string
+  userId: number;
 
   @Column()
-  fullIp:string
+  nodeIp: string;
+
+  @Column()
+  fullIp: string;
 
   @ManyToOne(() => User, (user) => user.setup)
-  @JoinColumn({ name: 'userId' }) 
+  @JoinColumn({ name: 'userId' })
   user: User;
 
   @OneToMany(() => wpPlugin, (wpPlugin) => wpPlugin.setup)
-  @JoinColumn({ name: 'setupId' }) 
+  @JoinColumn({ name: 'setupId' })
   wpPlugins: wpPlugin[];
 
   @OneToMany(() => wpTheme, (wpTheme) => wpTheme.setup)
-  @JoinColumn({ name: 'setupId' }) 
+  @JoinColumn({ name: 'setupId' })
   wpThemes: wpTheme[];
 
   @OneToMany(() => WpUser, (wpUser) => wpUser.setup)
-  @JoinColumn({ name: 'setupId' }) 
+  @JoinColumn({ name: 'setupId' })
   wpUsers: WpUser[];
 }

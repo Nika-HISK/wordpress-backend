@@ -26,7 +26,8 @@ export class SetupRepository {
     wpReplicaSet: string,
     sqlReplicaSet: string,
     nodeIp: string,
-    fullIp: string
+    fullIp: string,
+    dbName: string
 
   ): Promise<Setup> {
 
@@ -51,6 +52,7 @@ export class SetupRepository {
     newSetup.sqlReplicaSet = sqlReplicaSet;
     newSetup.nodeIp = nodeIp;
     newSetup.fullIp = fullIp
+    newSetup.dbName = dbName
 
     return await this.setupRepository.save(newSetup);
   }

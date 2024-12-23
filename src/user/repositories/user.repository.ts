@@ -33,7 +33,8 @@ export class UserRepository {
         'setup.nameSpace',
         'setup.wpVersion',
         'setup.nodeIp',
-        'setup.fullIp'
+        'setup.fullIp',
+        'setup.dbName'
       ])
       .getOne();
     }
