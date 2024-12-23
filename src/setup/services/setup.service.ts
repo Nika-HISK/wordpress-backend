@@ -40,10 +40,88 @@ export class SetupService {
     const wpAdminEmail = createSetupDto.wpAdminEmail || 'example@example.com';
     const wpAdminPassword = createSetupDto.wpAdminPassword || 'password123';
 
-    // Step 1: Create Namespace
+
     await this.k8sService.createNamespace(namespace);
 
-    // Step 2: Create MySQL Secret
+
+    const mysqlPVManifest = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolume',
+      metadata: {
+        name: `mysql-pv-${instanceId}`,
+        namespace,
+        labels: { app: `mysql-pv-label-${instanceId}` },
+      },
+      spec: {
+        capacity: {
+          storage: '10Gi',
+        },
+        accessModes: ['ReadWriteOnce'],
+        persistentVolumeReclaimPolicy: 'Retain',
+        hostPath: { path: `/mnt/data/mysql-${instanceId}` },
+      },
+    };
+
+    const wpPVManifest = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolume',
+      metadata: {
+        name: `wordpress-pv-${instanceId}`,
+        namespace,
+        labels: { app: `wordpress-pv-label-${instanceId}` },
+      },
+      spec: {
+        capacity: {
+          storage: '10Gi',
+        },
+        accessModes: ['ReadWriteOnce'],
+        persistentVolumeReclaimPolicy: 'Retain',
+        hostPath: { path: `/mnt/data/wordpress-${instanceId}` },
+      },
+    };
+
+  await this.k8sService.applyManifest(namespace, mysqlPVManifest);
+  await this.k8sService.applyManifest(namespace, wpPVManifest);
+
+
+  const mysqlPVCManifest = {
+    apiVersion: 'v1',
+    kind: 'PersistentVolumeClaim',
+    metadata: {
+      name: `mysql-pvc-${instanceId}`,
+      namespace,
+      labels: { app: `mysql-pv-label-${instanceId}` },
+    },
+    spec: {
+      accessModes: ['ReadWriteOnce'],
+      resources: {
+        requests: { storage: '10Gi' },
+      },
+    },
+  };
+
+  const wpPVCManifest = {
+    apiVersion: 'v1',
+    kind: 'PersistentVolumeClaim',
+    metadata: {
+      name: `wordpress-pvc-${instanceId}`,
+      namespace,
+      labels: { app: `wordpress-pv-label-${instanceId}` },
+    },
+    spec: {
+      accessModes: ['ReadWriteOnce'],
+      resources: {
+        requests: { storage: '10Gi' },
+      },
+    },
+  };
+  
+
+  await this.k8sService.applyManifest(namespace, mysqlPVCManifest);
+  await this.k8sService.applyManifest(namespace, wpPVCManifest);
+
+
+   
     const mysqlSecretManifest = {
       apiVersion: 'v1',
       kind: 'Secret',
@@ -55,7 +133,7 @@ export class SetupService {
     };
     await this.k8sService.applyManifest(namespace, mysqlSecretManifest);
 
-    // Step 3: Deploy MySQL
+
     const mysqlDeploymentManifest = {
       apiVersion: 'apps/v1',
       kind: 'Deployment',
@@ -83,6 +161,20 @@ export class SetupService {
                   },
                   { name: 'MYSQL_DATABASE', value: 'wordpress' },
                 ],
+                volumeMounts: [
+                  {
+                    name: 'mysql-pv',
+                    mountPath: '/var/lib/mysql',
+                  },
+                ],
+              },
+            ],
+            volumes: [
+              {
+                name: 'mysql-pv',
+                persistentVolumeClaim: {
+                  claimName: `mysql-pvc-${instanceId}`,
+                },
               },
             ],
           },
@@ -154,7 +246,6 @@ export class SetupService {
     };
     await this.k8sService.applyManifest(namespace, phpAdminServiceManifest);
 
-    // Step 4: Deploy WordPress
     const wordpressDeploymentManifest = {
       apiVersion: 'apps/v1',
       kind: 'Deployment',
@@ -194,6 +285,20 @@ export class SetupService {
                     },
                   },
                 ],
+                volumeMounts: [
+                  {
+                    name: 'wordpress-pv',
+                    mountPath: '/var/www/html',
+                  },
+                ],
+              },
+            ],
+            volumes: [
+              {
+                name: 'wordpress-pv',
+                persistentVolumeClaim: {
+                  claimName: `wordpress-pvc-${instanceId}`,
+                },
               },
             ],
           },

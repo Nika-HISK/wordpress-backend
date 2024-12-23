@@ -35,7 +35,9 @@ export class KubernetesService {
       if (error.body?.reason === 'AlreadyExists') {
         this.logger.warn(`Namespace "${namespaceName}" already exists.`);
       } else {
-        this.logger.error(`Failed to create namespace "${namespaceName}": ${error.message}`);
+        this.logger.error(
+          `Failed to create namespace "${namespaceName}": ${error.message}`,
+        );
         throw error;
       }
     }
@@ -44,11 +46,17 @@ export class KubernetesService {
   async applyManifest(namespace: string, manifest: any): Promise<void> {
     try {
       switch (manifest.kind) {
+        case 'PersistentVolume':
+          await this.coreApi.createPersistentVolume(manifest);
+          break;
         case 'Secret':
           await this.coreApi.createNamespacedSecret(namespace, manifest);
           break;
         case 'PersistentVolumeClaim':
-          await this.coreApi.createNamespacedPersistentVolumeClaim(namespace, manifest);
+          await this.coreApi.createNamespacedPersistentVolumeClaim(
+            namespace,
+            manifest,
+          );
           break;
         case 'Deployment':
           await this.appsApi.createNamespacedDeployment(namespace, manifest);
@@ -56,16 +64,23 @@ export class KubernetesService {
         case 'Ingress':
           await this.networkingApi.createNamespacedIngress(namespace, manifest);
           break;
+        case 'ConfigMap':
+          await this.coreApi.createNamespacedConfigMap(namespace, manifest);
+          break;
         case 'Service':
           await this.coreApi.createNamespacedService(namespace, manifest);
           break;
         default:
           throw new Error(`Unsupported manifest kind: ${manifest.kind}`);
       }
-      this.logger.log(`${manifest.kind} applied successfully in namespace "${namespace}".`);
+      this.logger.log(
+        `${manifest.kind} applied successfully in namespace "${namespace}".`,
+      );
     } catch (error) {
       if (error.body?.reason === 'AlreadyExists') {
-        this.logger.warn(`${manifest.kind} already exists in namespace "${namespace}".`);
+        this.logger.warn(
+          `${manifest.kind} already exists in namespace "${namespace}".`,
+        );
       } else {
         this.logger.error(`Error applying ${manifest.kind}: ${error.message}`);
         throw error;
@@ -75,10 +90,15 @@ export class KubernetesService {
 
   async getService(namespace: string, serviceName: string): Promise<any> {
     try {
-      const { body } = await this.coreApi.readNamespacedService(serviceName, namespace);
+      const { body } = await this.coreApi.readNamespacedService(
+        serviceName,
+        namespace,
+      );
       return body;
     } catch (error) {
-      this.logger.error(`Failed to get service "${serviceName}" in namespace "${namespace}": ${error.message}`);
+      this.logger.error(
+        `Failed to get service "${serviceName}" in namespace "${namespace}": ${error.message}`,
+      );
       throw error;
     }
   }
@@ -89,20 +109,37 @@ export class KubernetesService {
       const { body } = await this.coreApi.readNamespacedPod(podName, namespace);
       return body;
     } catch (error) {
-      this.logger.error(`Failed to get pod "${podName}" in namespace "${namespace}": ${error.message}`);
+      this.logger.error(
+        `Failed to get pod "${podName}" in namespace "${namespace}": ${error.message}`,
+      );
       throw error;
     }
   }
-  async findPodByLabel(namespace: string, labelKey: string, labelValue: string): Promise<string> {
+  async findPodByLabel(
+    namespace: string,
+    labelKey: string,
+    labelValue: string,
+  ): Promise<string> {
     try {
-      const { body } = await this.coreApi.listNamespacedPod(namespace, undefined, undefined, undefined, undefined, `${labelKey}=${labelValue}`);
+      const { body } = await this.coreApi.listNamespacedPod(
+        namespace,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        `${labelKey}=${labelValue}`,
+      );
       if (body.items.length === 0) {
-        throw new Error(`No pod found with label ${labelKey}=${labelValue} in namespace ${namespace}`);
+        throw new Error(
+          `No pod found with label ${labelKey}=${labelValue} in namespace ${namespace}`,
+        );
       }
       const podName = body.items[0].metadata?.name;
-      
+
       if (!podName) {
-        throw new Error(`Pod metadata.name not found for label ${labelKey}=${labelValue}`);
+        throw new Error(
+          `Pod metadata.name not found for label ${labelKey}=${labelValue}`,
+        );
       }
       return podName;
     } catch (error) {
@@ -115,19 +152,21 @@ export class KubernetesService {
     try {
       const networkStats = execSync(
         `kubectl exec -n ${namespace} ${podName} -- cat /proc/net/dev`,
-        { encoding: 'utf-8' }
+        { encoding: 'utf-8' },
       );
-  
+
       const diskUsage = execSync(
         `kubectl exec -n ${namespace} ${podName} -- df -h`,
-        { encoding: 'utf-8' }
+        { encoding: 'utf-8' },
       );
-  
+
       // Parse network stats
       const networkStatsLines = networkStats.split('\n');
-      const eth0Stats = networkStatsLines.find(line => line.startsWith('  eth0:'));
+      const eth0Stats = networkStatsLines.find((line) =>
+        line.startsWith('  eth0:'),
+      );
       const eth0Values = eth0Stats?.split(/\s+/).filter(Boolean);
-  
+
       const bandwidth = eth0Values
         ? {
             receive: {
@@ -140,21 +179,22 @@ export class KubernetesService {
             },
           }
         : null;
-  
+
       // Dynamically adjust bandwidth (add 10MB for testing)
       if (bandwidth) {
         bandwidth.receive.bytes += 10 * 1024 * 1024; // Add 10 MB to receive bytes
         bandwidth.transmit.bytes += 10 * 1024 * 1024; // Add 10 MB to transmit bytes
       }
-  
-      const totalBandwidthBytes = (bandwidth?.receive.bytes || 0) + (bandwidth?.transmit.bytes || 0);
+
+      const totalBandwidthBytes =
+        (bandwidth?.receive.bytes || 0) + (bandwidth?.transmit.bytes || 0);
       const totalBandwidthMB = Math.round(totalBandwidthBytes / (1024 * 1024)); // Convert bytes to MB
-  
+
       // Parse disk usage
       const diskUsageLines = diskUsage.split('\n').slice(1); // Skip header line
       const diskUsageFormatted = diskUsageLines
-        .filter(line => line.trim())
-        .map(line => {
+        .filter((line) => line.trim())
+        .map((line) => {
           const parts = line.split(/\s+/);
           return {
             filesystem: parts[0],
@@ -165,33 +205,35 @@ export class KubernetesService {
             mountedOn: parts[5],
           };
         });
-  
+
       // Sum up disk usage across all filesystems
       let totalDiskUsedInMB = 0;
-  
-      diskUsageFormatted.forEach(disk => {
+
+      diskUsageFormatted.forEach((disk) => {
         const used = disk.used.toUpperCase();
         let usedValue = 0;
-  
+
         // Handle different units (GB, MB, etc.)
         if (used.includes('G')) {
           usedValue = parseFloat(used.replace('G', '')) * 1024; // Convert GB to MB
         } else if (used.includes('M')) {
           usedValue = parseFloat(used.replace('M', ''));
         }
-  
+
         totalDiskUsedInMB += usedValue;
       });
-  
+
       // Optionally, dynamically adjust the total disk usage (e.g., add 1GB for testing)
       totalDiskUsedInMB += 1024; // Add 1GB (1024MB) for testing
-  
+
       return {
         bandwidth: `${totalBandwidthMB} MB`, // Send bandwidth in MB
         totalDiskUsed: `${totalDiskUsedInMB} MB`, // Send total used disk space in MB
       };
     } catch (error) {
-      this.logger.error(`Error fetching metrics for pod "${podName}" in namespace "${namespace}": ${error.message}`);
+      this.logger.error(
+        `Error fetching metrics for pod "${podName}" in namespace "${namespace}": ${error.message}`,
+      );
       throw error;
     }
   }
@@ -208,11 +250,19 @@ export class KubernetesService {
     }
   }
 
-  async getNodeInternalIpForPod(podName: string, namespace: string): Promise<string> {
+  async getNodeInternalIpForPod(
+    podName: string,
+    namespace: string,
+  ): Promise<string> {
     try {
       // Step 1: Get pod details
-      console.log(`Fetching details for pod: ${podName} in namespace: ${namespace}`);
-      const podResponse = await this.coreApi.readNamespacedPod(podName, namespace);
+      console.log(
+        `Fetching details for pod: ${podName} in namespace: ${namespace}`,
+      );
+      const podResponse = await this.coreApi.readNamespacedPod(
+        podName,
+        namespace,
+      );
       const pod = podResponse.body;
       const nodeName = pod.spec?.nodeName;
 
@@ -225,7 +275,9 @@ export class KubernetesService {
       console.log(`Fetching details for node: ${nodeName}`);
       const nodeResponse = await this.coreApi.readNode(nodeName);
       const node = nodeResponse.body;
-      const internalIp = node.status?.addresses?.find((addr) => addr.type === 'InternalIP')?.address;
+      const internalIp = node.status?.addresses?.find(
+        (addr) => addr.type === 'InternalIP',
+      )?.address;
 
       if (!internalIp) {
         console.error(`Internal IP not found for node ${nodeName}`);
@@ -235,9 +287,10 @@ export class KubernetesService {
       console.log(`Internal IP for node ${nodeName}: ${internalIp}`);
       return internalIp;
     } catch (error) {
-      console.error(`Error fetching internal IP for pod ${podName}: ${error.message}`);
+      console.error(
+        `Error fetching internal IP for pod ${podName}: ${error.message}`,
+      );
       throw error;
     }
   }
-  
 }
