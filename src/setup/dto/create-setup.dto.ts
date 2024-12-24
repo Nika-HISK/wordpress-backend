@@ -1,15 +1,18 @@
-import { IsString } from "class-validator";
+import { IsString } from 'class-validator';
 
 export class CreateSetupDto {
-    @IsString()
-    wpAdminUser:string
+  @IsString()
+  siteName: string;
 
-    @IsString()
-    wpAdminPassword:string
+  @IsString()
+  wpAdminUser: string;
 
-    @IsString()
-    wpAdminEmail:string
+  @IsString()
+  wpAdminPassword: string;
 
-    @IsString()
-    siteTitle:string
+  @IsString()
+  wpAdminEmail: string;
+
+  @IsString()
+  siteTitle: string;
 }

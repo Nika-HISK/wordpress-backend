@@ -35,15 +35,88 @@ export class SetupService {
     const instanceId = crypto.randomBytes(4).toString('hex');
     const uniqueId = crypto.randomBytes(6).toString('hex');
     const mysqlPassword = crypto.randomBytes(8).toString('hex');
-    const siteTitle = createSetupDto.siteTitle || 'My WordPress Site';
-    const wpAdminUser = createSetupDto.wpAdminUser || 'admin';
-    const wpAdminEmail = createSetupDto.wpAdminEmail || 'example@example.com';
-    const wpAdminPassword = createSetupDto.wpAdminPassword || 'password123';
+    const siteTitle = createSetupDto.siteTitle;
+    const wpAdminUser = createSetupDto.wpAdminUser;
+    const wpAdminEmail = createSetupDto.wpAdminEmail;
+    const wpAdminPassword = createSetupDto.wpAdminPassword;
+    const siteName = createSetupDto.siteName;
 
-    // Step 1: Create Namespace
     await this.k8sService.createNamespace(namespace);
 
-    // Step 2: Create MySQL Secret
+    const mysqlPVManifest = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolume',
+      metadata: {
+        name: `mysql-pv-${instanceId}`,
+        namespace,
+        labels: { app: `mysql-pv-label-${instanceId}` },
+      },
+      spec: {
+        capacity: {
+          storage: '10Gi',
+        },
+        accessModes: ['ReadWriteOnce'],
+        persistentVolumeReclaimPolicy: 'Retain',
+        hostPath: { path: `/mnt/data/mysql-${instanceId}` },
+      },
+    };
+
+    const wpPVManifest = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolume',
+      metadata: {
+        name: `wordpress-pv-${instanceId}`,
+        namespace,
+        labels: { app: `wordpress-pv-label-${instanceId}` },
+      },
+      spec: {
+        capacity: {
+          storage: '10Gi',
+        },
+        accessModes: ['ReadWriteOnce'],
+        persistentVolumeReclaimPolicy: 'Retain',
+        hostPath: { path: `/mnt/data/wordpress-${instanceId}` },
+      },
+    };
+
+    await this.k8sService.applyManifest(namespace, mysqlPVManifest);
+    await this.k8sService.applyManifest(namespace, wpPVManifest);
+
+    const mysqlPVCManifest = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: {
+        name: `mysql-pvc-${instanceId}`,
+        namespace,
+        labels: { app: `mysql-pv-label-${instanceId}` },
+      },
+      spec: {
+        accessModes: ['ReadWriteOnce'],
+        resources: {
+          requests: { storage: '10Gi' },
+        },
+      },
+    };
+
+    const wpPVCManifest = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: {
+        name: `wordpress-pvc-${instanceId}`,
+        namespace,
+        labels: { app: `wordpress-pv-label-${instanceId}` },
+      },
+      spec: {
+        accessModes: ['ReadWriteOnce'],
+        resources: {
+          requests: { storage: '10Gi' },
+        },
+      },
+    };
+
+    await this.k8sService.applyManifest(namespace, mysqlPVCManifest);
+    await this.k8sService.applyManifest(namespace, wpPVCManifest);
+
     const mysqlSecretManifest = {
       apiVersion: 'v1',
       kind: 'Secret',
@@ -55,7 +128,6 @@ export class SetupService {
     };
     await this.k8sService.applyManifest(namespace, mysqlSecretManifest);
 
-    // Step 3: Deploy MySQL
     const mysqlDeploymentManifest = {
       apiVersion: 'apps/v1',
       kind: 'Deployment',
@@ -83,6 +155,20 @@ export class SetupService {
                   },
                   { name: 'MYSQL_DATABASE', value: 'wordpress' },
                 ],
+                volumeMounts: [
+                  {
+                    name: 'mysql-pv',
+                    mountPath: '/var/lib/mysql',
+                  },
+                ],
+              },
+            ],
+            volumes: [
+              {
+                name: 'mysql-pv',
+                persistentVolumeClaim: {
+                  claimName: `mysql-pvc-${instanceId}`,
+                },
               },
             ],
           },
@@ -103,7 +189,47 @@ export class SetupService {
     };
     await this.k8sService.applyManifest(namespace, mysqlServiceManifest);
 
-    // Step 4: Deploy WordPress
+    const phpAdminDeploymentManifest = {
+      apiVersion: 'apps/v1',
+      kind: 'Deployment',
+      metadata: { name: `phpadmin-${instanceId}`, namespace },
+      spec: {
+        replicas: 1,
+        selector: { matchLabels: { app: `phpadmin-${instanceId}` } },
+        template: {
+          metadata: { labels: { app: `phpadmin-${instanceId}` } },
+          spec: {
+            containers: [
+              {
+                name: 'phpmyadmin',
+                image: 'phpmyadmin:latest',
+                ports: [{ containerPort: 80 }],
+                env: [
+                  {
+                    name: 'PMA_HOST',
+                    value: `mysql-${instanceId}`,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    };
+    await this.k8sService.applyManifest(namespace, phpAdminDeploymentManifest);
+
+    const phpAdminServiceManifest = {
+      apiVersion: 'v1',
+      kind: 'Service',
+      metadata: { name: `phpadmin-${instanceId}`, namespace },
+      spec: {
+        ports: [{ protocol: 'TCP', port: 8080, targetPort: 80 }],
+        selector: { app: `phpadmin-${instanceId}` },
+        type: 'LoadBalancer',
+      },
+    };
+    await this.k8sService.applyManifest(namespace, phpAdminServiceManifest);
+
     const wordpressDeploymentManifest = {
       apiVersion: 'apps/v1',
       kind: 'Deployment',
@@ -143,6 +269,20 @@ export class SetupService {
                     },
                   },
                 ],
+                volumeMounts: [
+                  {
+                    name: 'wordpress-pv',
+                    mountPath: '/var/www/html',
+                  },
+                ],
+              },
+            ],
+            volumes: [
+              {
+                name: 'wordpress-pv',
+                persistentVolumeClaim: {
+                  claimName: `wordpress-pvc-${instanceId}`,
+                },
               },
             ],
           },
@@ -235,6 +375,13 @@ export class SetupService {
       podName,
       'wp theme activate twentytwentyfour --allow-root',
     );
+    const output = await this.runKubectlCommand(
+      namespace,
+      podName,
+      'wp db size --format=json --allow-root',
+    );
+    const dbName = JSON.parse(output);
+    const readydbName = dbName[0].Name;
 
     // Set file permissions
     console.log('Setting file permissions...');
@@ -267,23 +414,32 @@ export class SetupService {
     );
     const wpVersion = wpVersionOutput.trim();
 
-    const sqlPodName = await this.k8sService.findPodByLabel(namespace, 'app', `mysql-${instanceId}`);
+    const sqlPodName = await this.k8sService.findPodByLabel(
+      namespace,
+      'app',
+      `mysql-${instanceId}`,
+    );
     const wpDeployment = `wordpress-${instanceId}`;
-    const sqlDeployment = `mysql-${instanceId}`
+    const sqlDeployment = `mysql-${instanceId}`;
     const replicaSets = await this.k8sService.listReplicaSets(namespace);
-    const wpReplicaSet = replicaSets.find(rs =>
-      rs.metadata?.ownerReferences?.some(owner => owner.name === wpDeployment)
+    const wpReplicaSet = replicaSets.find((rs) =>
+      rs.metadata?.ownerReferences?.some(
+        (owner) => owner.name === wpDeployment,
+      ),
     )?.metadata?.name;
-    
-    const sqlReplicaSet = replicaSets.find(rs =>
-      rs.metadata?.ownerReferences?.some(owner => owner.name === sqlDeployment)
+
+    const sqlReplicaSet = replicaSets.find((rs) =>
+      rs.metadata?.ownerReferences?.some(
+        (owner) => owner.name === sqlDeployment,
+      ),
     )?.metadata?.name;
-    const nodeIp = await this.k8sService.getNodeInternalIpForPod(podName, namespace)
-    const fullIp = `${nodeIp}:${nodePort}`
+    const nodeIp = await this.k8sService.getNodeInternalIpForPod(
+      podName,
+      namespace,
+    );
+    const fullIp = `${nodeIp}:${nodePort}`;
 
     console.log(wpReplicaSet, sqlReplicaSet);
-    
-    
 
     await this.setupRepository.SaveUserWordpress(
       namespace,
@@ -299,7 +455,10 @@ export class SetupService {
       wpReplicaSet,
       sqlReplicaSet,
       nodeIp,
-      fullIp
+      fullIp,
+      readydbName,
+      mysqlPassword,
+      siteName,
     );
 
     // Retrieve NodePort for WordPress (if exposed as LoadBalancer)
@@ -310,43 +469,43 @@ export class SetupService {
     };
   }
 
-  async deleteSetup(setupId:number) {
-    const setup = await this.findOne(setupId)
-    
+  async deleteSetup(setupId: number) {
+    const setup = await this.findOne(setupId);
+
     await execAsync(`
       kubectl delete deployment ${setup.wpDeployment} -n ${setup.nameSpace}
-    `)
+    `);
     await execAsync(`
     kubectl delete deployment ${setup.sqlDeployment} -n ${setup.nameSpace}
-  `)
-    return await this.setupRepository.deleteSetup(setupId)
+  `);
+    return await this.setupRepository.deleteSetup(setupId);
   }
 
   async resetSetup(wpAdminPassword: string, userId: number, setupId: number) {
-    const setup = await this.findOne(setupId)
+    const setup = await this.findOne(setupId);
 
     console.log(setup);
-    
 
-    const createSetupDto ={
+    const createSetupDto = {
       wpAdminUser: setup.wpAdminUser,
       wpAdminPassword: wpAdminPassword,
       wpAdminEmail: setup.wpAdminEmail,
-      siteTitle: setup.siteTitle
-      
-    }
+      siteTitle: setup.siteTitle,
+      siteName: setup.siteName,
+    };
 
-    await this.deleteSetup(setupId)
+    await this.deleteSetup(setupId);
     setTimeout(() => {
       console.log('This will run after 10 seconds');
-  }, 50000);
+    }, 50000);
 
-    const newSetup = await this.setupWordPress(createSetupDto, userId)
+    const newSetup = await this.setupWordPress(createSetupDto, userId);
 
-    return `succsesfully reseted on port ${newSetup.wordpressUrl}`
+    return `succsesfully reseted on port ${newSetup.wordpressUrl}`;
   }
-
-  
+  async getDecryptedMysqlPassword(id: number) {
+    return await this.setupRepository.getDecryptedMysqlPassword(id);
+  }
 
   async findAll() {
     return await this.setupRepository.findAll();

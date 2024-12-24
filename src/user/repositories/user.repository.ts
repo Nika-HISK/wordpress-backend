@@ -1,23 +1,21 @@
-import { InjectRepository } from "@nestjs/typeorm";
-import { User } from "../entities/user.entity";
-import { Repository } from "typeorm";
-import { CreateUserDto } from "../dto/create-user.dto";
+import { InjectRepository } from '@nestjs/typeorm';
+import { User } from '../entities/user.entity';
+import { Repository } from 'typeorm';
+import { CreateUserDto } from '../dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
-import { error } from "console";
-import { UpdateUserDto } from "../dto/update-user.dto";
-import { NotFoundException } from "@nestjs/common";
-
-
+import { error } from 'console';
+import { UpdateUserDto } from '../dto/update-user.dto';
+import { HttpException, NotFoundException } from '@nestjs/common';
 
 export class UserRepository {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
 
-    constructor(
-        @InjectRepository(User)
-        private readonly userRepository:Repository<User>
-    ) {}
-
-    async me(userId: number) {
-      return await this.userRepository.createQueryBuilder('user')
+  async me(userId: number) {
+    const user = await this.userRepository
+      .createQueryBuilder('user')
       .leftJoinAndSelect('user.setup', 'setup')
       .where('user.id = :userId', { userId })
       .select([
@@ -33,81 +31,110 @@ export class UserRepository {
         'setup.nameSpace',
         'setup.wpVersion',
         'setup.nodeIp',
-        'setup.fullIp'
+        'setup.fullIp',
+        'setup.dbName',
+        'setup.siteName',
       ])
       .getOne();
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
     }
-  
+    return user;
+  }
 
-    async create(createUserDto: CreateUserDto) {
-        let hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-        const confitmHashedPassword = await bcrypt.hash(createUserDto.confirmPassword, 10);
+  async create(createUserDto: CreateUserDto) {
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const confirmHashedPassword = await bcrypt.hash(
+      createUserDto.confirmPassword,
+      10,
+    );
 
-        if(hashedPassword = confitmHashedPassword) {
+    if (hashedPassword !== confirmHashedPassword) {
+      throw new HttpException('Passwords do not match', 400);
+    }
 
-        const newUser = new User();
-        newUser.firstName = createUserDto.firstName
-        newUser.lastName = createUserDto.lastName
-        newUser.email = createUserDto.email;
-        newUser.password = hashedPassword;
-         this.userRepository.save(newUser);
+    const newUser = new User();
+    newUser.firstName = createUserDto.firstName;
+    newUser.lastName = createUserDto.lastName;
+    newUser.email = createUserDto.email;
+    newUser.password = hashedPassword;
 
-         return 'user succesfully registered'
+    await this.userRepository.save(newUser);
+    return 'User successfully registered';
+  }
 
-    } else throw new error('password does not match confirmPassword')
-    
-      }
+  async findAll() {
+    const users = await this.userRepository.find();
+    if (!users || users.length === 0) {
+      throw new HttpException('No users found', 404);
+    }
+    return users;
+  }
 
-      async findAll() {
-        return this.userRepository.find()
-      }
+  async findOne(id: number) {
+    const user = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.setup', 'setup')
+      .where('user.id = :id', { id })
+      .getOne();
 
-      async findOne(id: number) {
-        return await this.userRepository
-          .createQueryBuilder('user')
-          .leftJoinAndSelect('user.setup', 'setup') 
-          .where('user.id = :id', { id })
-          .getOne();
-      }
-      
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    return user;
+  }
 
-      async findOneByEmail(email:string) {
-        return await this.userRepository.findOneBy({email})
+  async findOneByEmail(email: string) {
+    const user = await this.userRepository.findOneBy({ email });
+    if (!user) {
+      throw new NotFoundException(`User with email ${email} not found`);
+    }
+    return user;
+  }
 
+  async update(id: number, updateUserDto: Partial<User>) {
+    const user = await this.findOne(id);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
 
-      }
-      
-      async update(id: number, updateUserDto: Partial<User>) {
-        const user = await this.findOne(id); 
-        if (!user) {
-          throw new Error(`User with ID ${id} not found`); 
-        }
-        await this.userRepository.update(id, updateUserDto);
-        return this.findOne(id); 
-      }
+    await this.userRepository.update(id, updateUserDto);
+    return this.findOne(id);
+  }
 
-      async delete(id:number) {
-        return this.userRepository.delete(id)
-      }
+  async delete(id: number) {
+    const result = await this.userRepository.delete(id);
+    if (!result.affected) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    return { message: `User with ID ${id} successfully deleted` };
+  }
 
-      async updatePassword(id: number, currentPassword:string, newPassword: string) {
-        const user = await this.userRepository.findOneBy({ id });
+  async updatePassword(
+    id: number,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.findOne(id);
 
-        if (!user) {
-            throw new NotFoundException('User not found');
-          }
+    const isCurrentPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password,
+    );
+    if (!isCurrentPasswordValid) {
+      throw new HttpException('Current password is incorrect', 400);
+    }
 
-          let currentHashed = await bcrypt.hash(currentPassword, 10);
-          const newHashedPassword = await bcrypt.hash(newPassword, 10);
+    const isNewPasswordSame = await bcrypt.compare(newPassword, user.password);
+    if (isNewPasswordSame) {
+      throw new HttpException(
+        'New password cannot be the same as the current password',
+        400,
+      );
+    }
 
-
-          
-        if(currentHashed == user.password && newHashedPassword != user.password) {
-            user.password = newHashedPassword;
-    
-            return this.userRepository.save(user);
-        }
-      }
-
-      
+    user.password = await bcrypt.hash(newPassword, 10);
+    return this.userRepository.save(user);
+  }
 }
