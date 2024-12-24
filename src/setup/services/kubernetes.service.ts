@@ -293,4 +293,33 @@ export class KubernetesService {
       throw error;
     }
   }
+
+  async getPhpMyAdminNodePort(
+    instanceId: string,
+    namespace: string,
+  ): Promise<string> {
+    try {
+      console.log(`Fetching details for phpMyAdmin service with instanceId: ${instanceId} in namespace: ${namespace}`);
+      const phpMyAdminServiceResponse = await this.coreApi.readNamespacedService(
+        `phpadmin-${instanceId}`,
+        namespace,
+      );
+      const phpMyAdminService = phpMyAdminServiceResponse.body;
+
+      const phpMyAdminNodePort = phpMyAdminService.spec.ports.find(
+        (port) => port.port === 8080, 
+      )?.nodePort;
+
+      if (!phpMyAdminNodePort) {
+        console.error('NodePort for phpMyAdmin service not found');
+        throw new Error('NodePort for phpMyAdmin service not found');
+      }
+
+      console.log(`NodePort for phpMyAdmin service: ${phpMyAdminNodePort}`);
+      return phpMyAdminNodePort.toString(); 
+    } catch (error) {
+      console.error(`Error fetching NodePort for phpMyAdmin: ${error.message}`);
+      throw error;
+    }
+  }
 }

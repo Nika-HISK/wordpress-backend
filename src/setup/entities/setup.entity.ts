@@ -62,7 +62,10 @@ export class Setup extends baseEntity {
   nodeIp: string;
 
   @Column()
-  fullIp: string;
+  wpfullIp: string;
+
+  @Column()
+  phpAdminFullIp: string
 
   @Column()
   mysqlPassword: string;

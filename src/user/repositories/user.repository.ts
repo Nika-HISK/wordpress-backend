@@ -31,9 +31,10 @@ export class UserRepository {
         'setup.nameSpace',
         'setup.wpVersion',
         'setup.nodeIp',
-        'setup.fullIp',
+        'setup.wpfullIp',
         'setup.dbName',
         'setup.siteName',
+        'setup.phpAdminFullIp'
       ])
       .getOne();
 

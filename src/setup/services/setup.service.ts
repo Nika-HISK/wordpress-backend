@@ -437,7 +437,10 @@ export class SetupService {
       podName,
       namespace,
     );
-    const fullIp = `${nodeIp}:${nodePort}`;
+    const wpfullIp = `${nodeIp}:${nodePort}`;
+    const phpAminIp = await this.k8sService.getPhpMyAdminNodePort(instanceId, namespace)
+
+    const phpAdminFullIp = `${nodeIp}:${phpAminIp}`
 
     console.log(wpReplicaSet, sqlReplicaSet);
 
@@ -455,10 +458,11 @@ export class SetupService {
       wpReplicaSet,
       sqlReplicaSet,
       nodeIp,
-      fullIp,
+      wpfullIp,
       readydbName,
       mysqlPassword,
       siteName,
+      phpAdminFullIp
     );
 
     // Retrieve NodePort for WordPress (if exposed as LoadBalancer)

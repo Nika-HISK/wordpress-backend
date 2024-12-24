@@ -65,10 +65,11 @@ export class SetupRepository {
     wpReplicaSet: string,
     sqlReplicaSet: string,
     nodeIp: string,
-    fullIp: string,
+    wpfullIp: string,
     dbName: string,
     mysqlPassword: string,
     siteName: string,
+    phpAdminFullIp: string
   ): Promise<Setup> {
     const encryptedMysqlPassword = this.encrypt(mysqlPassword);
     const hashedPassword = await bcrypt.hash(
@@ -93,10 +94,11 @@ export class SetupRepository {
     newSetup.wpReplicaSet = wpReplicaSet;
     newSetup.sqlReplicaSet = sqlReplicaSet;
     newSetup.nodeIp = nodeIp;
-    newSetup.fullIp = fullIp;
+    newSetup.wpfullIp = wpfullIp;
     newSetup.dbName = dbName;
     newSetup.siteName = siteName;
     newSetup.mysqlPassword = encryptedMysqlPassword;
+    newSetup.phpAdminFullIp = phpAdminFullIp
 
     return await this.setupRepository.save(newSetup);
   }
