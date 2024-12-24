@@ -5,7 +5,7 @@ import { CreateUserDto } from '../dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 import { error } from 'console';
 import { UpdateUserDto } from '../dto/update-user.dto';
-import { HttpException, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 
 export class UserRepository {
   constructor(
@@ -44,20 +44,18 @@ export class UserRepository {
   }
 
   async create(createUserDto: CreateUserDto) {
-    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-    const confirmHashedPassword = await bcrypt.hash(
-      createUserDto.confirmPassword,
-      10,
-    );
+    const { firstName, lastName, email, password, confirmPassword } = createUserDto;
 
-    if (hashedPassword !== confirmHashedPassword) {
-      throw new HttpException('Passwords do not match', 400);
+    if (password !== confirmPassword) {
+      throw new HttpException('Passwords do not match', HttpStatus.BAD_REQUEST);
     }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const newUser = new User();
-    newUser.firstName = createUserDto.firstName;
-    newUser.lastName = createUserDto.lastName;
-    newUser.email = createUserDto.email;
+    newUser.firstName = firstName;
+    newUser.lastName = lastName;
+    newUser.email = email;
     newUser.password = hashedPassword;
 
     await this.userRepository.save(newUser);
@@ -86,11 +84,7 @@ export class UserRepository {
   }
 
   async findOneByEmail(email: string) {
-    const user = await this.userRepository.findOneBy({ email });
-    if (!user) {
-      throw new NotFoundException(`User with email ${email} not found`);
-    }
-    return user;
+    return this.userRepository.findOneBy({ email }); 
   }
 
   async update(id: number, updateUserDto: Partial<User>) {
