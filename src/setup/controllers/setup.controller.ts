@@ -44,29 +44,36 @@ export class SetupController {
   @Roles(Role.USER)
   @Post('resetSetup/:id')
   async resetSetup(
-      @Body('wpAdminPassword') wpAdminPassword: string, 
-      @Req() req: any, 
-      @Param('id') setupId: string
+    @Body('wpAdminPassword') wpAdminPassword: string,
+    @Req() req: any,
+    @Param('id') setupId: string,
   ) {
-      if (!wpAdminPassword || typeof wpAdminPassword !== 'string') {
-          throw new BadRequestException('Invalid wpAdminPassword: Must be a non-empty string.');
-      }
-  
-      return await this.setupService.resetSetup(wpAdminPassword, req.user.id, Number(setupId));
+    if (!wpAdminPassword || typeof wpAdminPassword !== 'string') {
+      throw new BadRequestException(
+        'Invalid wpAdminPassword: Must be a non-empty string.',
+      );
+    }
+
+    return await this.setupService.resetSetup(
+      wpAdminPassword,
+      req.user.id,
+      Number(setupId),
+    );
   }
-  
-  
 
   @Roles(Role.USER)
   @Get('metrics/:namespace/:podName')
-  async getPodMetrics(@Param('namespace') namespace: string, @Param('podName') podName: string) {
+  async getPodMetrics(
+    @Param('namespace') namespace: string,
+    @Param('podName') podName: string,
+  ) {
     return await this.k8sService.getPodMetrics(namespace, podName);
   }
 
   @Roles(Role.USER)
-  @Get('wordpress')
-  async findAll() {
-    return await this.setupService.findAll();
+  @Get('dbPassword/:setupId')
+  async getDecryptedMysqlPassword(@Param('setupId') setupId: number) {
+    return await this.setupService.getDecryptedMysqlPassword(setupId);
   }
 
   @Roles(Role.USER)
@@ -78,7 +85,7 @@ export class SetupController {
   @Roles(Role.USER)
   @Delete('/setup/:id')
   async deleteSetup(@Param('id') id: string) {
-    return await this.setupService.deleteSetup(Number(id))
+    return await this.setupService.deleteSetup(Number(id));
   }
 
   @Roles(Role.USER)

@@ -38,6 +38,9 @@ export class Setup extends baseEntity {
   sqlPodName: string;
 
   @Column()
+  siteName: string;
+
+  @Column()
   wpDeployment: string;
 
   @Column()
@@ -60,6 +63,9 @@ export class Setup extends baseEntity {
 
   @Column()
   fullIp: string;
+
+  @Column()
+  mysqlPassword: string;
 
   @ManyToOne(() => User, (user) => user.setup)
   @JoinColumn({ name: 'userId' })

@@ -35,14 +35,13 @@ export class SetupService {
     const instanceId = crypto.randomBytes(4).toString('hex');
     const uniqueId = crypto.randomBytes(6).toString('hex');
     const mysqlPassword = crypto.randomBytes(8).toString('hex');
-    const siteTitle = createSetupDto.siteTitle || 'My WordPress Site';
-    const wpAdminUser = createSetupDto.wpAdminUser || 'admin';
-    const wpAdminEmail = createSetupDto.wpAdminEmail || 'example@example.com';
-    const wpAdminPassword = createSetupDto.wpAdminPassword || 'password123';
-
+    const siteTitle = createSetupDto.siteTitle;
+    const wpAdminUser = createSetupDto.wpAdminUser;
+    const wpAdminEmail = createSetupDto.wpAdminEmail;
+    const wpAdminPassword = createSetupDto.wpAdminPassword;
+    const siteName = createSetupDto.siteName;
 
     await this.k8sService.createNamespace(namespace);
-
 
     const mysqlPVManifest = {
       apiVersion: 'v1',
@@ -80,48 +79,44 @@ export class SetupService {
       },
     };
 
-  await this.k8sService.applyManifest(namespace, mysqlPVManifest);
-  await this.k8sService.applyManifest(namespace, wpPVManifest);
+    await this.k8sService.applyManifest(namespace, mysqlPVManifest);
+    await this.k8sService.applyManifest(namespace, wpPVManifest);
 
-
-  const mysqlPVCManifest = {
-    apiVersion: 'v1',
-    kind: 'PersistentVolumeClaim',
-    metadata: {
-      name: `mysql-pvc-${instanceId}`,
-      namespace,
-      labels: { app: `mysql-pv-label-${instanceId}` },
-    },
-    spec: {
-      accessModes: ['ReadWriteOnce'],
-      resources: {
-        requests: { storage: '10Gi' },
+    const mysqlPVCManifest = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: {
+        name: `mysql-pvc-${instanceId}`,
+        namespace,
+        labels: { app: `mysql-pv-label-${instanceId}` },
       },
-    },
-  };
-
-  const wpPVCManifest = {
-    apiVersion: 'v1',
-    kind: 'PersistentVolumeClaim',
-    metadata: {
-      name: `wordpress-pvc-${instanceId}`,
-      namespace,
-      labels: { app: `wordpress-pv-label-${instanceId}` },
-    },
-    spec: {
-      accessModes: ['ReadWriteOnce'],
-      resources: {
-        requests: { storage: '10Gi' },
+      spec: {
+        accessModes: ['ReadWriteOnce'],
+        resources: {
+          requests: { storage: '10Gi' },
+        },
       },
-    },
-  };
-  
+    };
 
-  await this.k8sService.applyManifest(namespace, mysqlPVCManifest);
-  await this.k8sService.applyManifest(namespace, wpPVCManifest);
+    const wpPVCManifest = {
+      apiVersion: 'v1',
+      kind: 'PersistentVolumeClaim',
+      metadata: {
+        name: `wordpress-pvc-${instanceId}`,
+        namespace,
+        labels: { app: `wordpress-pv-label-${instanceId}` },
+      },
+      spec: {
+        accessModes: ['ReadWriteOnce'],
+        resources: {
+          requests: { storage: '10Gi' },
+        },
+      },
+    };
 
+    await this.k8sService.applyManifest(namespace, mysqlPVCManifest);
+    await this.k8sService.applyManifest(namespace, wpPVCManifest);
 
-   
     const mysqlSecretManifest = {
       apiVersion: 'v1',
       kind: 'Secret',
@@ -132,7 +127,6 @@ export class SetupService {
       },
     };
     await this.k8sService.applyManifest(namespace, mysqlSecretManifest);
-
 
     const mysqlDeploymentManifest = {
       apiVersion: 'apps/v1',
@@ -214,16 +208,6 @@ export class SetupService {
                   {
                     name: 'PMA_HOST',
                     value: `mysql-${instanceId}`,
-                  },
-                  { name: 'PMA_USER', value: 'root' },
-                  {
-                    name: 'PMA_PASSWORD',
-                    valueFrom: {
-                      secretKeyRef: {
-                        name: `mysql-secret-${instanceId}`,
-                        key: 'MYSQL_ROOT_PASSWORD',
-                      },
-                    },
                   },
                 ],
               },
@@ -473,6 +457,8 @@ export class SetupService {
       nodeIp,
       fullIp,
       readydbName,
+      mysqlPassword,
+      siteName,
     );
 
     // Retrieve NodePort for WordPress (if exposed as LoadBalancer)
@@ -505,6 +491,7 @@ export class SetupService {
       wpAdminPassword: wpAdminPassword,
       wpAdminEmail: setup.wpAdminEmail,
       siteTitle: setup.siteTitle,
+      siteName: setup.siteName,
     };
 
     await this.deleteSetup(setupId);
@@ -515,6 +502,9 @@ export class SetupService {
     const newSetup = await this.setupWordPress(createSetupDto, userId);
 
     return `succsesfully reseted on port ${newSetup.wordpressUrl}`;
+  }
+  async getDecryptedMysqlPassword(id: number) {
+    return await this.setupRepository.getDecryptedMysqlPassword(id);
   }
 
   async findAll() {
