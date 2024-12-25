@@ -9,6 +9,8 @@ import {
   Put,
   Delete,
   Patch,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { wpcliService } from '../services/wpcli.service';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
@@ -55,10 +57,10 @@ export class wpcliController {
         data: status,
       };
     } catch (error) {
-      return {
-        status: 'error',
-        message: error.message,
-      };
+      throw new HttpException(
+        error.message || 'Failed to get maintenance status',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -69,7 +71,14 @@ export class wpcliController {
     @Param('setupId') setupId: number,
     @Param('mode') mode: 'enable' | 'disable',
   ) {
-    return this.wpCliService.wpMaintenance(setupId, mode);
+    try {
+      return await this.wpCliService.wpMaintenance(setupId, mode);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to toggle maintenance mode',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
@@ -93,10 +102,10 @@ export class wpcliController {
         data: result,
       };
     } catch (error) {
-      return {
-        status: 'error',
-        message: error.message,
-      };
+      throw new HttpException(
+        error.message || 'Search and replace failed',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -107,7 +116,14 @@ export class wpcliController {
     @Param('setupId') setupId: number,
     @Query('search') search?: string,
   ) {
-    return this.wpCliService.wpThemeList(setupId, search);
+    try {
+      return await this.wpCliService.wpThemeList(setupId, search);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to list themes',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
@@ -117,7 +133,14 @@ export class wpcliController {
     @Param('setupId') setupId: number,
     @Body('theme') theme: string,
   ) {
-    return this.wpCliService.wpThemeActivate(setupId, theme);
+    try {
+      return await this.wpCliService.wpThemeActivate(setupId, theme);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to activate theme',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
@@ -127,17 +150,30 @@ export class wpcliController {
     @Param('setupId') setupId: number,
     @Body('theme') theme: string,
   ) {
-    return this.wpCliService.wpThemeDelete(setupId, theme);
+    try {
+      return await this.wpCliService.wpThemeDelete(setupId, theme);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to delete theme',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
   @ApiWpThemeUpdate()
-  @Put('theme/:setupId')
-  async wpThemeUpdate(
+  @Put('themes/:setupId')
+  async wpThemesUpdate(
     @Param('setupId') setupId: number,
-    @Body('theme') theme: string,
+    @Body('themes') themes: string[],
   ) {
-    return this.wpCliService.wpThemeUpdate(setupId, theme);
+    if (!Array.isArray(themes) || themes.length === 0) {
+      throw new HttpException(
+        'Themes array is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    return this.wpCliService.wpThemesUpdate(setupId, themes);
   }
 
   @Roles(Role.USER)
@@ -147,7 +183,14 @@ export class wpcliController {
     @Param('setupId') setupId: number,
     @Query('search') search?: string,
   ) {
-    return this.wpCliService.wpPluginList(setupId, search);
+    try {
+      return await this.wpCliService.wpPluginList(setupId, search);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to list plugins',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
@@ -157,7 +200,14 @@ export class wpcliController {
     @Param('setupId') setupId: number,
     @Body('plugin') plugin: string,
   ) {
-    return this.wpCliService.wpPluginActivate(setupId, plugin);
+    try {
+      return await this.wpCliService.wpPluginActivate(setupId, plugin);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to activate plugin',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
@@ -167,7 +217,14 @@ export class wpcliController {
     @Param('setupId') setupId: number,
     @Body('plugin') plugin: string,
   ) {
-    return this.wpCliService.wpPluginDeactivate(setupId, plugin);
+    try {
+      return await this.wpCliService.wpPluginDeactivate(setupId, plugin);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to deactivate plugin',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
@@ -177,17 +234,37 @@ export class wpcliController {
     @Param('setupId') setupId: number,
     @Body('plugin') plugin: string,
   ) {
-    return this.wpCliService.wpPluginDelete(setupId, plugin);
+    try {
+      return await this.wpCliService.wpPluginDelete(setupId, plugin);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to delete plugin',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
   @ApiWpPluginUpdate()
-  @Put('plugin/:setupId')
-  async wpPluginUpdate(
+  @Put('plugins/:setupId')
+  async wpPluginsUpdate(
     @Param('setupId') setupId: number,
-    @Body('plugin') plugin: string,
+    @Body('plugins') plugins: string[],
   ) {
-    return this.wpCliService.wpPluginUpdate(setupId, plugin);
+    if (!Array.isArray(plugins) || plugins.length === 0) {
+      throw new HttpException(
+        'Plugins array is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    try {
+      return await this.wpCliService.wpPluginsUpdate(setupId, plugins);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to update plugins',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
@@ -197,7 +274,14 @@ export class wpcliController {
     @Param('setupId') setupId: number,
     @Query('search') search?: string,
   ) {
-    return this.wpCliService.wpUserList(setupId, search);
+    try {
+      return await this.wpCliService.wpUserList(setupId, search);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to list users',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
@@ -207,7 +291,14 @@ export class wpcliController {
     @Param('setupId') setupId: number,
     @Body('userId') userId: number,
   ) {
-    return this.wpCliService.wpUserDelete(setupId, userId);
+    try {
+      return await this.wpCliService.wpUserDelete(setupId, userId);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to delete user',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
@@ -218,40 +309,83 @@ export class wpcliController {
     @Body('userId') userId: number,
     @Body('role') role: string,
   ) {
-    return this.wpCliService.wpUserRoleUpdate(setupId, userId, role);
+    try {
+      return await this.wpCliService.wpUserRoleUpdate(setupId, userId, role);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to update user role',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
+
   @Roles(Role.USER)
   @ApiWpCoreVersion()
   @Get('core/version/:setupId')
   async wpCoreVersion(@Param('setupId') setupId: number) {
-    return this.wpCliService.wpCoreVersion(setupId);
+    try {
+      return await this.wpCliService.wpCoreVersion(setupId);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to get core version',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
   @ApiWpCoreCheckUpdate()
   @Get('wpcore/check-update/:setupId')
   async wpCoreCheckUpdate(@Param('setupId') setupId: number) {
-    return this.wpCliService.wpCoreCheckUpdate(setupId);
+    try {
+      return await this.wpCliService.wpCoreCheckUpdate(setupId);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to check for core update',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
   @ApiWpDbName()
   @Get('db/name/:setupId')
   async wpDbSize(@Param('setupId') setupId: number) {
-    return this.wpCliService.wpDbSize(setupId);
+    try {
+      return await this.wpCliService.wpDbSize(setupId);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to get database size',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
   @ApiWpRoleList()
   @Get('wprole/:setupId')
   async wpRoles(@Param('setupId') setupId: number) {
-    return await this.wpCliService.wpRoles(setupId);
+    try {
+      return await this.wpCliService.wpRoles(setupId);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to get user roles',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Roles(Role.USER)
   @ApiWpGetPhpVersion()
   @Get('php/version/:setupId')
   async wpGetPhpVersion(@Param('setupId') setupId: number): Promise<any> {
-    return this.wpCliService.wpGetPhpVersion(setupId);
+    try {
+      return await this.wpCliService.wpGetPhpVersion(setupId);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to get PHP version',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }
