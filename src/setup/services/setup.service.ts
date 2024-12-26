@@ -462,7 +462,8 @@ export class SetupService {
       readydbName,
       mysqlPassword,
       siteName,
-      phpAdminFullIp
+      phpAdminFullIp,
+      instanceId
     );
 
     // Retrieve NodePort for WordPress (if exposed as LoadBalancer)

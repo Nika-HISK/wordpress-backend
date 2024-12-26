@@ -13,27 +13,37 @@ export class FilesService {
       private readonly s3Service: s3Service,
     ) {}
 
-  async uploadFile(
-    file: Express.Multer.File,
-    userId:number
-  ): Promise<{ url: string; key: string; bucket: string }> {
-    const fileName = file.originalname;
-    const result = await this.s3Service.upload(file, fileName);
+    async uploadFile(
+      file: Express.Multer.File,
+    ): Promise<{ url: string; key: string; bucket: string }> {
+      const fileName = file.originalname;
+      const result = await this.s3Service.upload(file, fileName);
+  
+      const savedFile = await this.filesRepository.save(
+        fileName,
+        result.Location,
+        result.Key,
+        result.Bucket,
+      );
 
-    const savedFile = await this.filesRepository.save(
-      fileName,
-      result.Location,
-      result.Key,
-      result.Bucket,
-      userId
-    );
+      const protectedUrl = await this.s3Service.getPresignedUrl(savedFile.key)
 
-    return {
-      url: savedFile.url,
-      key: savedFile.key,
-      bucket: savedFile.bucket,
-    };
-  }
+      savedFile.url =  protectedUrl
+      
+  
+      return {
+        url: savedFile.url,
+        key: savedFile.key,
+        bucket: savedFile.bucket,
+      };
+    }
+    
+
+    async getFileDetails(file: Express.Multer.File): Promise<{ path: string }> {
+      return {
+        path: file.path,
+      };
+    }
 
 
 

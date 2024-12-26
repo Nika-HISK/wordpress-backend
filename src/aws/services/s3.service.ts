@@ -4,21 +4,17 @@ import { MimeType } from 'aws-sdk/clients/kendra';
 
 @Injectable()
 export class s3Service {
-  private s3Client = new AWS.S3();
+  private s3Client: AWS.S3;
   private BucketName: string;
   private region: string;
 
   constructor() {
-     AWS.config.update({
+    this.s3Client = new AWS.S3({
       accessKeyId: process.env.AWS_ACCES_KEY,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       region: process.env.AWS_REGION,
-      signatureVersion: 'v2',
-      
-      
-      
+      signatureVersion: 'v4',
     });
-    this.s3Client = new AWS.S3()
     this.BucketName = process.env.AWS_S3_BUCKET;
     this.region = process.env.AWS_REGION;
   }
@@ -29,6 +25,7 @@ export class s3Service {
     const mimeType = file.mimetype;
 
     const fileKey = key;
+
     const params = {
       Bucket: this.BucketName,
       Key: fileKey,
@@ -39,8 +36,6 @@ export class s3Service {
         LocationConstraint: this.region,
       },
     };
-
-    
 
     try {
       return await this.s3Client.upload(params).promise();
