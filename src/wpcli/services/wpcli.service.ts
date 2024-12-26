@@ -198,16 +198,14 @@ export class wpcliService {
     return plugins;
   }
 
-  async wpPluginActivate(setupId: number, plugin: string): Promise<string> {
-    if (!plugin) {
+  async wpPluginActivate(setupId: number, plugins: string[]): Promise<string[]> {
+    if (!plugins || plugins.length === 0) {
       throw new HttpException(
-        'Plugin name is required',
+        'At least one plugin name is required',
         HttpStatus.BAD_REQUEST,
       );
     }
-
-    const command = `wp plugin activate ${plugin} --allow-root`;
-
+  
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {
       throw new HttpException(
@@ -215,38 +213,53 @@ export class wpcliService {
         HttpStatus.NOT_FOUND,
       );
     }
+  
+    const results: string[] = [];
+  
+    for (const plugin of plugins) {
+      const command = `wp plugin activate ${plugin} --allow-root`;
+      const result = await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        command,
+      );
+      results.push(result);
+    }
+  
+    return results;
+  }
 
-    return this.setupService.runKubectlCommand(
-      setup.nameSpace,
-      setup.podName,
-      command,
+async wpPluginDeactivate(setupId: number, plugins: string[]): Promise<string[]> {
+  if (!plugins || plugins.length === 0) {
+    throw new HttpException(
+      'At least one plugin name is required',
+      HttpStatus.BAD_REQUEST,
     );
   }
 
-  async wpPluginDeactivate(setupId: number, plugin: string): Promise<string> {
-    if (!plugin) {
-      throw new HttpException(
-        'Plugin name is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  const setup = await this.setupService.findOne(setupId);
+  if (!setup) {
+    throw new HttpException(
+      `Setup with ID ${setupId} not found`,
+      HttpStatus.NOT_FOUND,
+    );
+  }
 
+  const results: string[] = [];
+
+  // Loop through plugins and run the command for each one
+  for (const plugin of plugins) {
     const command = `wp plugin deactivate ${plugin} --allow-root`;
-
-    const setup = await this.setupService.findOne(setupId);
-    if (!setup) {
-      throw new HttpException(
-        `Setup with ID ${setupId} not found`,
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    return this.setupService.runKubectlCommand(
+    const result = await this.setupService.runKubectlCommand(
       setup.nameSpace,
       setup.podName,
       command,
     );
+    results.push(result);
   }
+
+  return results;
+}
 
   async wpPluginDelete(setupId: number, plugin: string): Promise<string> {
     if (!plugin) {

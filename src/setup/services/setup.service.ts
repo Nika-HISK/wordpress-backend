@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
@@ -26,7 +26,7 @@ export class SetupService {
       return stdout;
     } catch (error) {
       console.error(`Command "${command}" failed:`, error);
-      throw new Error(`Failed to execute command "${command}"`);
+      throw new InternalServerErrorException(`Failed to execute command "${command}"`);
     }
   }
 
@@ -474,41 +474,55 @@ export class SetupService {
   }
 
   async deleteSetup(setupId: number) {
-    const setup = await this.findOne(setupId);
+    try {
+      const setup = await this.findOne(setupId);
+      if (!setup) {
+        throw new NotFoundException(`Setup with ID ${setupId} not found`);
+      }
 
-    await execAsync(`
-      kubectl delete deployment ${setup.wpDeployment} -n ${setup.nameSpace}
-    `);
-    await execAsync(`
-    kubectl delete deployment ${setup.sqlDeployment} -n ${setup.nameSpace}
-  `);
-    return await this.setupRepository.deleteSetup(setupId);
+      await execAsync(`kubectl delete deployment ${setup.wpDeployment} -n ${setup.nameSpace}`);
+      await execAsync(`kubectl delete deployment ${setup.sqlDeployment} -n ${setup.nameSpace}`);
+      return await this.setupRepository.deleteSetup(setupId);
+    } catch (error) {
+      throw new InternalServerErrorException('Failed to delete setup', error.message);
+    }
   }
 
   async resetSetup(wpAdminPassword: string, userId: number, setupId: number) {
-    const setup = await this.findOne(setupId);
+    try {
+      const setup = await this.findOne(setupId);
+      if (!setup) {
+        throw new NotFoundException(`Setup with ID ${setupId} not found`);
+      }
 
-    console.log(setup);
+      const createSetupDto = {
+        wpAdminUser: setup.wpAdminUser,
+        wpAdminPassword: wpAdminPassword,
+        wpAdminEmail: setup.wpAdminEmail,
+        siteTitle: setup.siteTitle,
+        siteName: setup.siteName,
+      };
 
-    const createSetupDto = {
-      wpAdminUser: setup.wpAdminUser,
-      wpAdminPassword: wpAdminPassword,
-      wpAdminEmail: setup.wpAdminEmail,
-      siteTitle: setup.siteTitle,
-      siteName: setup.siteName,
-    };
+      await this.deleteSetup(setupId);
+      const newSetup = await this.setupWordPress(createSetupDto, userId);
 
-    await this.deleteSetup(setupId);
-    setTimeout(() => {
-      console.log('This will run after 10 seconds');
-    }, 50000);
-
-    const newSetup = await this.setupWordPress(createSetupDto, userId);
-
-    return `succsesfully reseted on port ${newSetup.wordpressUrl}`;
+      return `Successfully reset on port ${newSetup.wordpressUrl}`;
+    } catch (error) {
+      throw new InternalServerErrorException('Failed to reset setup', error.message);
+    }
   }
+
+
   async getDecryptedMysqlPassword(id: number) {
-    return await this.setupRepository.getDecryptedMysqlPassword(id);
+    try {
+      const password = await this.setupRepository.getDecryptedMysqlPassword(id);
+      if (!password) {
+        throw new NotFoundException(`MySQL password for setup with ID ${id} not found`);
+      }
+      return password;
+    } catch (error) {
+      throw new InternalServerErrorException('Failed to decrypt MySQL password', error.message);
+    }
   }
 
   async findAll() {
