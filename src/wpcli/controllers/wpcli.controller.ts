@@ -198,24 +198,25 @@ export class wpcliController {
   @Patch('plugin/enable/:setupId')
   async wpPluginActivate(
     @Param('setupId') setupId: number,
-    @Body('plugin') plugin: string,
+    @Body('plugins') plugins: string[],
   ) {
     try {
-      return await this.wpCliService.wpPluginActivate(setupId, plugin);
+      return await this.wpCliService.wpPluginActivate(setupId, plugins);
     } catch (error) {
       throw new HttpException(
-        error.message || 'Failed to activate plugin',
+        error.message || 'Failed to activate plugins',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
 
+  
   @Roles(Role.USER)
   @ApiWpPluginDeactivate()
   @Patch('plugin/disable/:setupId')
   async wpPluginDeactivate(
     @Param('setupId') setupId: number,
-    @Body('plugin') plugin: string,
+    @Body('plugin') plugin: string[],
   ) {
     try {
       return await this.wpCliService.wpPluginDeactivate(setupId, plugin);
