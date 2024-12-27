@@ -250,8 +250,14 @@ export class SetupService {
             containers: [
               {
                 name: 'wordpress',
-                image: 'wordpress:latest',
+                image: 'wordpress:php8.0-fpm', // Official WordPress image with PHP-FPM
                 ports: [{ containerPort: 80 }],
+                volumeMounts: [
+                  {
+                    name: 'wordpress-pv',
+                    mountPath: '/var/www/html', // WordPress default web root
+                  },
+                ],
                 env: [
                   {
                     name: 'WORDPRESS_DB_HOST',
@@ -269,12 +275,6 @@ export class SetupService {
                     },
                   },
                 ],
-                volumeMounts: [
-                  {
-                    name: 'wordpress-pv',
-                    mountPath: '/var/www/html',
-                  },
-                ],
               },
             ],
             volumes: [
@@ -290,6 +290,8 @@ export class SetupService {
       },
     };
     await this.k8sService.applyManifest(namespace, wordpressDeploymentManifest);
+
+    
 
     const wordpressServiceManifest = {
       apiVersion: 'v1',
@@ -330,22 +332,16 @@ export class SetupService {
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // Check if wp-config.php exists
-    try {
-      await this.runKubectlCommand(
-        namespace,
-        podName,
-        'ls /var/www/html/wp-config.php',
-      );
+    
       console.log('wp-config.php exists. Skipping removal.');
-    } catch {
       console.log('wp-config.php does not exist. Proceeding with creation...');
       await this.runKubectlCommand(
         namespace,
         podName,
-        `wp config create --dbname=wordpress --dbuser=root --dbpass=${mysqlPassword} --dbhost=mysql:3306 --path=/var/www/html --allow-root --force`,
+        `wp config create --dbname=wordpress --dbuser=root --dbpass=${mysqlPassword} --dbhost=mysql-${instanceId}:3306 --path=/var/www/html --allow-root --force`,
       );
       console.log('wp-config.php created.');
-    }
+    
     const wordpressService = await this.k8sService.getService(
       namespace,
       `wordpress-${instanceId}`,
@@ -356,11 +352,11 @@ export class SetupService {
 
     // Install WordPress
     console.log('Installing WordPress...');
-    await this.runKubectlCommand(
-      namespace,
-      podName,
-      `wp core install --url="http://49.12.148.222:${nodePort}" --title="${siteTitle}" --admin_user="${wpAdminUser}" --admin_password="${wpAdminPassword}" --admin_email="${wpAdminEmail}" --skip-email --allow-root`,
-    );
+    // await this.runKubectlCommand(
+    //   namespace,
+    //   podName,
+    //   `wp core install --url="http://49.12.148.222:${nodePort}" --title="${siteTitle}" --admin_user="${wpAdminUser}" --admin_password="${wpAdminPassword}" --admin_email="${wpAdminEmail}" --skip-email --allow-root`,
+    // );
     console.log('WordPress installed.');
 
     // Activate necessary plugins
