@@ -14,14 +14,13 @@ export class FilesRepository {
         private readonly s3Service:s3Service
     ) {}
 
-    async save(name: string, url: string, key: string, bucket: string, userId:number) {
+    async save(name: string, url: string, key: string, bucket: string) {
         const newFile = new FileEntity();
     
         newFile.fileName = name;
         newFile.url = url;
         newFile.key = key;
         newFile.bucket = bucket;
-        newFile.userId = userId
     
         return await this.fileRepository.save(newFile);
       }

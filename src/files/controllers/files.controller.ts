@@ -2,19 +2,19 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, Upl
 import { FilesService } from '../services/files.service';
 import { CreateFileDto } from '../dto/create-file.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Roles } from 'src/auth/guard/jwt-roles.guard';
+import { Role } from 'src/auth/guard/enum/role.enum';
 
 // @UseGuards(LocalAuthGuard)
 @Controller('files')
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
-  // @Roles(Role.USER)
+  @Roles(Role.USER)
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
-    const userId = req.user.id
-    
-    return await this.filesService.uploadFile(file, userId);
+  uploadFile(@UploadedFile() file: Express.Multer.File) {
+    return this.filesService.uploadFile(file);
   }
 
 }

@@ -5,7 +5,10 @@ import {
   AppsV1Api,
   NetworkingV1Api,
 } from '@kubernetes/client-node';
-import { execSync } from 'child_process';
+import { exec, execSync } from 'child_process';
+import { promisify } from 'util';
+const execAsync = promisify(exec);
+
 
 @Injectable()
 export class KubernetesService {
@@ -322,4 +325,49 @@ export class KubernetesService {
       throw error;
     }
   }
+
+  async executeShellCommand(command: string): Promise<string> {
+    try {
+      const { stdout, stderr } = await execAsync(command);
+
+      if (stderr) {
+        console.error(`Shell command error: ${stderr}`);
+        throw new Error(`Error executing command: ${stderr}`);
+      }
+
+      return stdout;
+    } catch (error) {
+      console.error(`Failed to execute command: ${command}`, error);
+      throw new Error(`Command execution failed: ${error.message}`);
+    }
+  }
+
+  async runWpCliCommand(command: string): Promise<string> {
+    try {
+      // Assuming you have the pod name and container name
+      const podName = 'your-wordpress-pod-name';  // Replace with your actual pod name
+      const containerName = 'your-wordpress-container-name';  // Replace with your actual container name
+      
+      // Formulate the kubectl exec command to run WP-CLI inside the container
+      const kubectlCommand = `kubectl exec ${podName} -c ${containerName} -- wp ${command}`;
+
+      // Execute the command
+      const { stdout, stderr } = await execAsync(kubectlCommand);
+
+      // Check if there was an error in the command
+      if (stderr) {
+        this.logger.error(`Error running WP-CLI command: ${stderr}`);
+        throw new Error(`Error running WP-CLI command: ${stderr}`);
+      }
+
+      // Log the successful output
+      this.logger.log(`WP-CLI command executed successfully: ${stdout}`);
+      
+      return stdout;
+    } catch (error) {
+      this.logger.error(`Failed to run WP-CLI command: ${error.message}`);
+      throw new Error(`Failed to run WP-CLI command: ${error.message}`);
+    }
+  }
+  
 }
