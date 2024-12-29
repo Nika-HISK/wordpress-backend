@@ -11,7 +11,7 @@ export class BackupController {
   @Roles(Role.USER)
   @Post('Manual/:setupId')
   async createBackup(@Param('setupId') setupId:string) {
-    return await this.backupService.createManualBackup(Number(setupId))
+    return await this.backupService.createManualS3Backup(Number(setupId))
   }
 
   @Roles(Role.USER)

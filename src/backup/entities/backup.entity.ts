@@ -16,4 +16,7 @@ export class Backup extends baseEntity {
 
   @ManyToOne(() => Setup, (setup) => setup.backups)
   setup:Setup
+
+  @Column({length:'1000'})
+  s3Url:string
 }

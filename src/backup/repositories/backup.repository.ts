@@ -26,13 +26,14 @@ export class BackupRepository {
     private readonly setupService: SetupService
   ) {}
 
-  async createManualBackup(backupName: string, setupId: number, instanceId: string) {
+  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3Url) {
   
 
   const newBackup = new Backup()
   newBackup.name = backupName
   newBackup.setupId = setupId
   newBackup.instanceId = instanceId
+  newBackup.s3Url = s3Url
 
   return await this.backupRepository.save(newBackup)
 

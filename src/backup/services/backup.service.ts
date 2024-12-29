@@ -9,6 +9,7 @@ import * as crypto from 'crypto';
 import { promisify } from 'util';
 import { s3Service } from 'src/aws/services/s3.service';
 import * as fs from 'fs';
+import * as os from 'os';
 
 
 const execAsync = promisify(exec);
@@ -24,71 +25,79 @@ export class BackupService {
     private readonly s3Service:s3Service
   ) {}
 
-  async createManualBackup(setupId: number) {
+  async createManualS3Backup(setupId: number) {
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
-    const backupName = `${setup.siteName}-${instanceId}.sql`;
-    const zipFileName = `${backupName}.zip`;
-  
-    // Execute commands inside the Kubernetes pod to create the backup and zip it
+    
+    // Replace spaces with hyphens in the site name to avoid spaces in the backup filename
+    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-');  // Replace spaces with hyphens
+    const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
+    const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
+    
+    const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${zipFileName}` : `/tmp/${zipFileName}`;
+    
     await execAsync(`
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "apt update && apt install -y mariadb-client zip && wp db export ${backupName} --allow-root && zip ${zipFileName} ${backupName}"
+      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "apt update && apt install -y mariadb-client zip && wp db export '${backupName}' --allow-root && zip '${zipFileName}' '${backupName}'"
     `);
-  
-    // Stream the zip file from the pod
-    const zipFileStream = spawn('kubectl', [
-      'exec',
-      '-n',
-      setup.nameSpace,
-      setup.podName,
-      '--',
-      'cat',
-      `/var/www/html/${zipFileName}`,
-    ]).stdout;
-  
-    // Convert the stream to a buffer for uploadFile
-    const chunks: Buffer[] = [];
-    for await (const chunk of zipFileStream) {
-      chunks.push(chunk);
-    }
-    const zipFileBuffer = Buffer.concat(chunks);
-  
-    // Upload the file using uploadFile from FilesService
+    
+    await execAsync(`
+      kubectl cp "${setup.nameSpace}/${setup.podName}:/var/www/html/${zipFileName}" "${tempZipPath}"
+    `);
+    
+    const fileContent = fs.readFileSync(tempZipPath);
     const uploadResult = await this.filesService.uploadFile({
       originalname: zipFileName,
       mimetype: 'application/zip',
-      buffer: zipFileBuffer,
+      buffer: fileContent,
     } as Express.Multer.File);
-  
-    // Clean up the backup and zip files from the pod
-    await execAsync(`
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "rm -f /var/www/html/${backupName} /var/www/html/${zipFileName}"
-    `);
-  
-    await this.backupRepository.createManualBackup(backupName, setupId, instanceId);
-  
+    
+    // Remove the temporary file
+    await execAsync(`rm -f ${tempZipPath}`);
+    
+    await this.backupRepository.createManualS3Backup(zipFileName, setupId, instanceId, uploadResult.url);
+    
     return { message: 'Backup created, zipped, and uploaded to S3', s3Url: uploadResult.url };
   }
+  
   
 
   async restoreBackup(backupId: number) {
     const backup = await this.backupRepository.findOne(backupId);
     const setup = await this.setupService.findOne(backup.setupId);
-
-    const tempZipPath = `/tmp/${backup.name}`;
-    const tempUnzipPath = `/tmp/${backup.name.replace('.zip', '')}`; 
+  
+    // Set temp paths based on the OS
+    const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${backup.name}` : `/tmp/${backup.name}`;
+    const tempUnzipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${backup.name.replace('.zip', '.sql')}` : `/tmp/${backup.name.replace('.zip', '.sql')}`;
+  
+    console.log(`Downloading zip file from S3 to: ${tempZipPath}`);
+    console.log(`Unzipping to: ${tempUnzipPath}`);
+  
     const presignedUrl = await this.s3Service.getPresignedUrl(backup.name);
     await execAsync(`curl -o ${tempZipPath} "${presignedUrl}"`);
-
+  
+    if (!fs.existsSync(tempZipPath)) {
+      throw new Error(`Backup file not found at ${tempZipPath}`);
+    }
+  
     await execAsync(`unzip -o ${tempZipPath} -d /tmp`);
-
+  
+    // Log unzipped contents for debugging purposes
+    const unzippedContents = fs.readdirSync('/tmp');
+    console.log('Unzipped contents of /tmp:', unzippedContents);
+  
+    if (!fs.existsSync(tempUnzipPath)) {
+      throw new Error(`Unzipped file not found at ${tempUnzipPath}`);
+    }
+  
     await execAsync(`
       kubectl cp ${tempUnzipPath} ${setup.nameSpace}/${setup.podName}:/var/www/html/${backup.name.replace('.zip', '')} && \
       kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "wp db import /var/www/html/${backup.name.replace('.zip', '')} --allow-root"
     `);
-
+  
     await execAsync(`rm -f ${tempZipPath} ${tempUnzipPath}`);
-
+  
     return { message: 'Backup restored successfully from zipped file' };
   }
+  
+  
 }
