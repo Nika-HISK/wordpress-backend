@@ -29,8 +29,7 @@ export class BackupService {
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
     
-    // Replace spaces with hyphens in the site name to avoid spaces in the backup filename
-    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-');  // Replace spaces with hyphens
+    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
     const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
     const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
     
@@ -51,7 +50,6 @@ export class BackupService {
       buffer: fileContent,
     } as Express.Multer.File);
     
-    // Remove the temporary file
     await execAsync(`rm -f ${tempZipPath}`);
     
     await this.backupRepository.createManualS3Backup(zipFileName, setupId, instanceId, uploadResult.url);
@@ -65,7 +63,6 @@ export class BackupService {
     const backup = await this.backupRepository.findOne(backupId);
     const setup = await this.setupService.findOne(backup.setupId);
   
-    // Set temp paths based on the OS
     const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${backup.name}` : `/tmp/${backup.name}`;
     const tempUnzipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${backup.name.replace('.zip', '.sql')}` : `/tmp/${backup.name.replace('.zip', '.sql')}`;
   
@@ -81,7 +78,6 @@ export class BackupService {
   
     await execAsync(`unzip -o ${tempZipPath} -d /tmp`);
   
-    // Log unzipped contents for debugging purposes
     const unzippedContents = fs.readdirSync('/tmp');
     console.log('Unzipped contents of /tmp:', unzippedContents);
   
