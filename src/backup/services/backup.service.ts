@@ -46,7 +46,7 @@ export class BackupService {
     await execAsync(`
       kubectl cp "${setup.nameSpace}/${setup.podName}:/var/www/html/${zipFileName}" "${tempZipPath}"
     `);
-    
+    // nikoloz -c7c40fdf.zip
     const fileContent = fs.readFileSync(tempZipPath);
     const uploadResult = await this.filesService.uploadFile({
       originalname: zipFileName,
@@ -100,15 +100,13 @@ export class BackupService {
   }
   
 
-  async createManualBackupToPod(setupId: number) {
+  async createManualBackupToPod(setupId: number, backupType: string) {
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
     
     const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
     const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
     const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
-
-    const backupType = 'pod'
     
     const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${zipFileName}` : `/tmp/${zipFileName}`;
     
@@ -175,13 +173,14 @@ export class BackupService {
   }
   
   private scheduleDailyBackups() {
+    const backupType = 'daily'
     this.backupInterval = setInterval(async () => {
       console.log('Starting daily backup process...');
       const setups = await this.setupService.findAll(); 
       for (const setup of setups) {
         try {
           console.log(`Creating backup for setup: ${setup.id}`);
-          await this.createManualBackupToPod(setup.id);
+          await this.createManualBackupToPod(setup.id, backupType);
         } catch (error) {
           console.error(`Failed to create backup for setup: ${setup.id}`, error);
         }

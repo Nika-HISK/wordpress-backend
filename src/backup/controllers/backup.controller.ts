@@ -23,7 +23,8 @@ export class BackupController {
   @Roles(Role.USER)
   @Post('ManualToPod/:setupId')
   async createManualBackupToPod(@Param('setupId') setupId:string) {
-    return await this.backupService.createManualBackupToPod(Number(setupId))
+    const backupType = 'pod'
+    return await this.backupService.createManualBackupToPod(Number(setupId), backupType)
   }
 
   @Roles(Role.USER)
