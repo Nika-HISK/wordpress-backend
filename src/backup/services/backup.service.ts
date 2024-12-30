@@ -25,9 +25,10 @@ export class BackupService {
     private readonly s3Service:s3Service
   ) {}
 
-  async createManualS3Backup(setupId: number) {
+  async createManualToS3(setupId: number) {
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
+    const backupType = 's3'
     
     const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
     const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
@@ -52,14 +53,14 @@ export class BackupService {
     
     await execAsync(`rm -f ${tempZipPath}`);
     
-    await this.backupRepository.createManualS3Backup(zipFileName, setupId, instanceId, uploadResult.url);
+    await this.backupRepository.createManualS3Backup(zipFileName, setupId, instanceId, uploadResult.url, backupType);
     
     return { message: 'Backup created, zipped, and uploaded to S3', s3Url: uploadResult.url };
   }
   
   
 
-  async restoreBackup(backupId: number) {
+  async restoreBackupFromS3(backupId: number) {
     const backup = await this.backupRepository.findOne(backupId);
     const setup = await this.setupService.findOne(backup.setupId);
   
@@ -94,6 +95,83 @@ export class BackupService {
   
     return { message: 'Backup restored successfully from zipped file' };
   }
+  
+
+  async createManualBackupToPod(setupId: number) {
+    const setup = await this.setupService.findOne(setupId);
+    const instanceId = crypto.randomBytes(4).toString('hex');
+    
+    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
+    const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
+    const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
+
+    const backupType = 'pod'
+    
+    const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${zipFileName}` : `/tmp/${zipFileName}`;
+    
+    await execAsync(`
+      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "apt update && apt install -y mariadb-client zip && wp db export '${backupName}' --allow-root && zip '${zipFileName}' '${backupName}'"
+    `);
+
+    
+    await execAsync(`
+      kubectl cp "${setup.nameSpace}/${setup.podName}:/var/www/html/${zipFileName}" "${tempZipPath}"
+    `);
+
+    await execAsync(`rm -f ${tempZipPath}`);
+
+
+    await this.backupRepository.createManulToPod(zipFileName, setupId, instanceId, backupType)
+
+    return { message: 'Backup created, zipped, and copyed into pod'};
+
+  }
+
+  async restoreManualFromPod(backupId: number) {
+    const backup = await this.backupRepository.findOne(backupId);
+    if (!backup || backup.type !== 'pod') {
+      throw new Error('Invalid backup or backup type is not "pod"');
+    }
+  
+    const setup = await this.setupService.findOne(backup.setupId);
+    if (!setup) {
+      throw new Error('Setup not found for the backup');
+    }
+  
+    const tempUnzipPath =
+      os.platform() === 'win32'
+        ? `${process.env.TEMP}\\${backup.name.replace('.zip', '.sql')}`
+        : `/tmp/${backup.name.replace('.zip', '.sql')}`;
+  
+    const tempZipPath =
+      os.platform() === 'win32'
+        ? `${process.env.TEMP}\\${backup.name}`
+        : `/tmp/${backup.name}`;
+  
+    await execAsync(`
+      kubectl cp "${setup.nameSpace}/${setup.podName}:/var/www/html/${backup.name}" "${tempZipPath}"
+    `);
+  
+    await execAsync(`unzip -o ${tempZipPath} -d /tmp`);
+  
+    if (!fs.existsSync(tempUnzipPath)) {
+      throw new Error(`Unzipped SQL file not found at ${tempUnzipPath}`);
+    }
+  
+    await execAsync(`
+      kubectl cp "${tempUnzipPath}" "${setup.nameSpace}/${setup.podName}:/var/www/html/${backup.name.replace('.zip', '.sql')}"
+    `);
+  
+    await execAsync(`
+      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "wp db import /var/www/html/${backup.name.replace('.zip', '.sql')} --allow-root"
+    `);
+  
+    await execAsync(`rm -f ${tempZipPath} ${tempUnzipPath}`);
+  
+    return { message: 'Backup restored successfully from pod' };
+  }
+  
+
   
   
 }

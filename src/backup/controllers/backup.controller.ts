@@ -9,15 +9,27 @@ export class BackupController {
   constructor(private readonly backupService: BackupService) {}
 
   @Roles(Role.USER)
-  @Post('Manual/:setupId')
-  async createBackup(@Param('setupId') setupId:string) {
-    return await this.backupService.createManualS3Backup(Number(setupId))
+  @Post('ManualToS3/:setupId')
+  async createManualToS3(@Param('setupId') setupId:string) {
+    return await this.backupService.createManualToS3(Number(setupId))
   }
 
   @Roles(Role.USER)
   @Post('restore/:backupId')
-  async restoreBackup(@Param('backupId') backupId:string) {
-    return await this.backupService.restoreBackup(Number(backupId))
+  async restoreBackupFromS3(@Param('backupId') backupId:string) {
+    return await this.backupService.restoreBackupFromS3(Number(backupId))
+  }
+
+  @Roles(Role.USER)
+  @Post('ManualToPod/:setupId')
+  async createManualBackupToPod(@Param('setupId') setupId:string) {
+    return await this.backupService.createManualBackupToPod(Number(setupId))
+  }
+
+  @Roles(Role.USER)
+  @Post('restoreFromPod/:backupId')
+  async restoreManualFromPod(@Param('backupId') backupId:string) {
+    return await this.backupService.restoreManualFromPod(Number(backupId))
   }
 
 }

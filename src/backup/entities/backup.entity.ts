@@ -17,6 +17,9 @@ export class Backup extends baseEntity {
   @ManyToOne(() => Setup, (setup) => setup.backups)
   setup:Setup
 
-  @Column({length:'1000'})
+  @Column({length:'1000', default:''})
   s3Url:string
+
+  @Column({type: 'enum', enum:['s3', 'pod', 'daily']})
+  type: string
 }

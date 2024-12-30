@@ -26,7 +26,7 @@ export class BackupRepository {
     private readonly setupService: SetupService
   ) {}
 
-  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3Url) {
+  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3Url: string, backupType: string) {
   
 
   const newBackup = new Backup()
@@ -34,10 +34,25 @@ export class BackupRepository {
   newBackup.setupId = setupId
   newBackup.instanceId = instanceId
   newBackup.s3Url = s3Url
+  newBackup.type = backupType
 
   return await this.backupRepository.save(newBackup)
 
   }
+
+
+  async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string) {
+  
+
+    const newBackup = new Backup()
+    newBackup.name = backupName
+    newBackup.setupId = setupId
+    newBackup.instanceId = instanceId
+    newBackup.type = backupType
+  
+    return await this.backupRepository.save(newBackup)
+  
+    }
 
   async createDailyBackup(setupId:number) {
     
