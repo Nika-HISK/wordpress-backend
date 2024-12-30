@@ -177,7 +177,7 @@ export class BackupService {
   private scheduleDailyBackups() {
     this.backupInterval = setInterval(async () => {
       console.log('Starting daily backup process...');
-      const setups = await this.setupService.findAll(); // Fetch all setups
+      const setups = await this.setupService.findAll(); 
       for (const setup of setups) {
         try {
           console.log(`Creating backup for setup: ${setup.id}`);
@@ -186,7 +186,7 @@ export class BackupService {
           console.error(`Failed to create backup for setup: ${setup.id}`, error);
         }
       }
-    }, 24 * 60 * 60 * 1000); // Every 24 hours
+    }, 86400000); 
   }
 
   onModuleInit() {
