@@ -25,6 +25,9 @@ export class BackupService {
     private readonly s3Service:s3Service
   ) {}
 
+  private backupInterval: NodeJS.Timeout;
+
+
   async createManualToS3(setupId: number) {
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
@@ -171,7 +174,32 @@ export class BackupService {
     return { message: 'Backup restored successfully from pod' };
   }
   
+  private scheduleDailyBackups() {
+    this.backupInterval = setInterval(async () => {
+      console.log('Starting daily backup process...');
+      const setups = await this.setupService.findAll(); // Fetch all setups
+      for (const setup of setups) {
+        try {
+          console.log(`Creating backup for setup: ${setup.id}`);
+          await this.createManualBackupToPod(setup.id);
+        } catch (error) {
+          console.error(`Failed to create backup for setup: ${setup.id}`, error);
+        }
+      }
+    }, 24 * 60 * 60 * 1000); // Every 24 hours
+  }
 
+  onModuleInit() {
+    console.log('BackupService initialized, starting daily backup scheduler...');
+    this.scheduleDailyBackups();
+  }
+
+  onModuleDestroy() {
+    if (this.backupInterval) {
+      clearInterval(this.backupInterval);
+      console.log('Daily backup scheduler stopped.');
+    }
+  }
   
   
 }
