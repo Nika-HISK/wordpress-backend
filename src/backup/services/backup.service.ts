@@ -29,9 +29,10 @@ export class BackupService {
 
 
   async createManualToS3(setupId: number) {
+    const whereGo = 's3'
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
-    const backupType = 's3'
+    const backupType = 'manual'
     
     const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
     const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
@@ -55,10 +56,10 @@ export class BackupService {
     } as Express.Multer.File);
     
     await execAsync(`rm -f ${tempZipPath}`);
+
+    const backup = await this.backupRepository.createManualS3Backup(zipFileName, setupId, instanceId, uploadResult.url, backupType, whereGo);
     
-    await this.backupRepository.createManualS3Backup(zipFileName, setupId, instanceId, uploadResult.url, backupType);
-    
-    return { message: 'Backup created, zipped, and uploaded to S3', s3Url: uploadResult.url };
+    return backup;
   }
   
   
@@ -66,6 +67,9 @@ export class BackupService {
   async restoreBackupFromS3(backupId: number) {
     const backup = await this.backupRepository.findOne(backupId);
     const setup = await this.setupService.findOne(backup.setupId);
+    if(backup.s3Url == null) {
+      return `backup with id ${backupId} does not have s3Url`
+    }
   
     const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${backup.name}` : `/tmp/${backup.name}`;
     const tempUnzipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${backup.name.replace('.zip', '.sql')}` : `/tmp/${backup.name.replace('.zip', '.sql')}`;
@@ -101,6 +105,7 @@ export class BackupService {
   
 
   async createManualBackupToPod(setupId: number, backupType: string) {
+    const whereGo = 'pod'
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
     
@@ -122,15 +127,15 @@ export class BackupService {
     await execAsync(`rm -f ${tempZipPath}`);
 
 
-    await this.backupRepository.createManulToPod(zipFileName, setupId, instanceId, backupType)
+    const backup = await this.backupRepository.createManulToPod(zipFileName, setupId, instanceId, backupType, whereGo);
 
-    return { message: 'Backup created, zipped, and copyed into pod'};
-
+    return backup;
+  
   }
 
   async restoreManualFromPod(backupId: number) {
     const backup = await this.backupRepository.findOne(backupId);
-    if (!backup || backup.type !== 'pod') {
+    if (!backup) {
       throw new Error('Invalid backup or backup type is not "pod"');
     }
   
@@ -200,5 +205,63 @@ export class BackupService {
     }
   }
   
+  async createHourBackup(setupId: number) {
+    setInterval(async () => {
+      const backup = await this.createManualBackupToPod(setupId, 'hourly');
+  
+      setTimeout(async () => {
+        await this.deleteBackupFromPod(backup.id);
+      }, 86400000); 
+    }, 3600000);  
+  }
+  
+
+
+  async createSixHourBackup(setupId: number) {
+    setInterval(async () => {
+      const backup = await this.createManualBackupToPod(setupId, 'six-hourly');
+      
+      setTimeout(async () => {
+        await this.deleteBackupFromPod(backup.id);
+      }, 86400000);
+    }, 21600000); 
+  }
+  
+  
+  async deleteBackupFromPod(backupId:number) {
+
+    const backup = await this.backupRepository.findOne(backupId)
+    const setup = await this.setupService.findOne(backup.setupId)
+    const zippedName =  backup.name
+    const sqlName = zippedName.replace('.zip', '.sql')
+
+    console.log(zippedName, sqlName);
+    
+
+    await execAsync(`
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "rm ${zippedName} && rm ${sqlName}"
+  `);
+
+    await this.backupRepository.deleteBackup(backupId)
+
+
+    return `succesfully deleted backup from pod and db with backupId:${backupId}`
+  }
+
+  async downloadBackup(backupId: number) {
+    const backup = await this.backupRepository.findOne(backupId)
+    if(backup.whereGo == 's3' && backup.s3Url) {
+      return backup.s3Url
+    }
+    return 'backup does not have s3Url or is not uploaded on s3'
+  }
+
+  async downloadableBackups() {
+    const backups = await this.backupRepository.findAll();
+    return backups.filter(backup => backup.whereGo === 's3');
+  }
+  
+  
+
   
 }

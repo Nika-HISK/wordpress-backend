@@ -26,7 +26,15 @@ export class BackupRepository {
     private readonly setupService: SetupService
   ) {}
 
-  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3Url: string, backupType: string) {
+  /*
+    @Column({type: 'enum', enum:[ 'daily', 'hourly', 'six-hourly', 'manual']})
+  type: string
+
+  @Column({type: 'enum', enum:['s3', 'pod']})
+  whereGo: string
+   */
+
+  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3Url: string, backupType: string, whereGo: string) {
   
 
   const newBackup = new Backup()
@@ -35,13 +43,14 @@ export class BackupRepository {
   newBackup.instanceId = instanceId
   newBackup.s3Url = s3Url
   newBackup.type = backupType
+  newBackup.whereGo = whereGo
 
   return await this.backupRepository.save(newBackup)
 
   }
 
 
-  async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string) {
+  async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string) {
   
 
     const newBackup = new Backup()
@@ -49,6 +58,7 @@ export class BackupRepository {
     newBackup.setupId = setupId
     newBackup.instanceId = instanceId
     newBackup.type = backupType
+    newBackup.whereGo = whereGo
   
     return await this.backupRepository.save(newBackup)
   
@@ -62,6 +72,14 @@ export class BackupRepository {
 
   async findOne(backupId: number) {
     return await this.backupRepository.findOneBy({id: backupId})
+  }
+
+  async deleteBackup(backupId: number) {
+    return await this.backupRepository.softDelete(backupId) 
+  }
+
+  async findAll() {
+    return await this.backupRepository.find()
   }
 
 }

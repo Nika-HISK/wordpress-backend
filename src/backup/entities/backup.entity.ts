@@ -20,6 +20,9 @@ export class Backup extends baseEntity {
   @Column({length:'1000', default:''})
   s3Url:string
 
-  @Column({type: 'enum', enum:['s3', 'pod', 'daily']})
+  @Column({type: 'enum', enum:[ 'daily', 'hourly', 'six-hourly', 'manual']})
   type: string
+
+  @Column({type: 'enum', enum:['s3', 'pod']})
+  whereGo: string
 }
