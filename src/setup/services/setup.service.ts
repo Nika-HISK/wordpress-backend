@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
@@ -17,7 +21,7 @@ export class SetupService {
   ) {}
 
   async runKubectlCommand(namespace: string, podName: string, command: string) {
-    const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -- ${command}`;
+    const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -c wordpress -- ${command}`;
     try {
       const { stdout, stderr } = await execAsync(kubectlCommand);
       if (stderr) {
@@ -26,7 +30,9 @@ export class SetupService {
       return stdout;
     } catch (error) {
       console.error(`Command "${command}" failed:`, error);
-      throw new InternalServerErrorException(`Failed to execute command "${command}"`);
+      throw new InternalServerErrorException(
+        `Failed to execute command "${command}"`,
+      );
     }
   }
 
@@ -233,7 +239,10 @@ export class SetupService {
     const wordpressDeploymentManifest = {
       apiVersion: 'apps/v1',
       kind: 'Deployment',
-      metadata: { name: `wordpress-${instanceId}`, namespace },
+      metadata: {
+        name: `wordpress-${instanceId}`,
+        namespace,
+      },
       spec: {
         replicas: 1,
         selector: {
@@ -244,44 +253,50 @@ export class SetupService {
         },
         template: {
           metadata: {
-            labels: { app: `wordpress-${instanceId}`, 'unique-id': uniqueId },
+            labels: {
+              app: `wordpress-${instanceId}`,
+              'unique-id': uniqueId,
+            },
           },
           spec: {
             containers: [
               {
-                name: 'wordpress',
-                image: 'wordpress:php8.0-fpm', // Official WordPress image with PHP-FPM
+                name: 'nginx',
+                image: 'nginx:latest',
                 ports: [{ containerPort: 80 }],
                 volumeMounts: [
-                  {
-                    name: 'wordpress-pv',
-                    mountPath: '/var/www/html', // WordPress default web root
-                  },
+                  { name: 'wordpress-content', mountPath: '/var/www/html' },
+                  { name: 'nginx-config', mountPath: '/etc/nginx/conf.d' },
                 ],
+              },
+              {
+                name: 'wordpress',
+                image: 'wordpress:php8.0-fpm',
                 env: [
                   {
                     name: 'WORDPRESS_DB_HOST',
                     value: `mysql-${instanceId}:3306`,
                   },
-                  { name: 'WORDPRESS_DB_NAME', value: 'wordpress' },
                   { name: 'WORDPRESS_DB_USER', value: 'root' },
-                  {
-                    name: 'WORDPRESS_DB_PASSWORD',
-                    valueFrom: {
-                      secretKeyRef: {
-                        name: `mysql-secret-${instanceId}`,
-                        key: 'MYSQL_ROOT_PASSWORD',
-                      },
-                    },
-                  },
+                  { name: 'WORDPRESS_DB_PASSWORD', value: `${mysqlPassword}` },
+                  { name: 'WORDPRESS_DB_NAME', value: 'wordpress' },
+                ],
+                volumeMounts: [
+                  { name: 'wordpress-content', mountPath: '/var/www/html' },
                 ],
               },
             ],
             volumes: [
               {
-                name: 'wordpress-pv',
+                name: 'wordpress-content',
                 persistentVolumeClaim: {
                   claimName: `wordpress-pvc-${instanceId}`,
+                },
+              },
+              {
+                name: 'nginx-config',
+                configMap: {
+                  name: `nginx-config-${instanceId}`,
                 },
               },
             ],
@@ -291,19 +306,70 @@ export class SetupService {
     };
     await this.k8sService.applyManifest(namespace, wordpressDeploymentManifest);
 
-    
-
     const wordpressServiceManifest = {
       apiVersion: 'v1',
       kind: 'Service',
-      metadata: { name: `wordpress-${instanceId}`, namespace },
+      metadata: {
+        name: `wordpress-${instanceId}`,
+        namespace,
+      },
       spec: {
-        ports: [{ protocol: 'TCP', port: 8081, targetPort: 80 }],
-        selector: { app: `wordpress-${instanceId}` },
-        type: 'LoadBalancer', // Expose WordPress via LoadBalancer
+        selector: {
+          app: `wordpress-${instanceId}`,
+          'unique-id': uniqueId,
+        },
+        ports: [
+          {
+            protocol: 'TCP',
+            port: 80,
+            targetPort: 80,
+          },
+        ],
+        type: 'LoadBalancer',
       },
     };
     await this.k8sService.applyManifest(namespace, wordpressServiceManifest);
+
+    const nginxConfigMapManifest = {
+      apiVersion: 'v1',
+      kind: 'ConfigMap',
+      metadata: {
+        name: `nginx-config-${instanceId}`,
+        namespace,
+      },
+      data: {
+        'default.conf': `
+          server {
+              listen 80;
+              server_name localhost;
+    
+              root /var/www/html;
+              index index.php index.html index.htm;
+    
+              # Main location block
+              location / {
+                  try_files $uri $uri/ /index.php?$args;
+              }
+    
+              # PHP handling block
+              location ~ \\.php$ {
+                  include fastcgi_params;
+                  fastcgi_pass 127.0.0.1:9000;
+                  fastcgi_index index.php;
+                  fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+              }
+    
+              # Deny access to hidden files (e.g., .htaccess)
+              location ~ /\\.ht {
+                  deny all;
+              }
+          }
+        `,
+      },
+    };
+    
+    await this.k8sService.applyManifest(namespace, nginxConfigMapManifest);
+    
 
     // Step 5: Save Pod Name in the Database
     const podName = await this.k8sService.findPodByLabel(
@@ -314,13 +380,13 @@ export class SetupService {
 
     await new Promise((resolve) => setTimeout(resolve, 3000));
     await this.runKubectlCommand(namespace, podName, 'apt-get update');
-    await this.runKubectlCommand(namespace, podName, 'apt-get install -y curl');
+    await this.runKubectlCommand(namespace, podName,'apt-get install -y curl');
     await this.runKubectlCommand(
       namespace,
       podName,
       'curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar',
     );
-    await this.runKubectlCommand(namespace, podName, 'chmod +x wp-cli.phar');
+    await this.runKubectlCommand(namespace, podName,'chmod +x wp-cli.phar');
     await this.runKubectlCommand(
       namespace,
       podName,
@@ -332,31 +398,31 @@ export class SetupService {
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // Check if wp-config.php exists
-    
-      console.log('wp-config.php exists. Skipping removal.');
-      console.log('wp-config.php does not exist. Proceeding with creation...');
-      await this.runKubectlCommand(
-        namespace,
-        podName,
-        `wp config create --dbname=wordpress --dbuser=root --dbpass=${mysqlPassword} --dbhost=mysql-${instanceId}:3306 --path=/var/www/html --allow-root --force`,
-      );
-      console.log('wp-config.php created.');
-    
+
+    console.log('wp-config.php exists. Skipping removal.');
+    console.log('wp-config.php does not exist. Proceeding with creation...');
+    await this.runKubectlCommand(
+      namespace,
+      podName,
+      `wp config create --dbname=wordpress --dbuser=root --dbpass=${mysqlPassword} --dbhost=mysql-${instanceId}:3306 --path=/var/www/html --allow-root --force`,
+    );
+    console.log('wp-config.php created.');
+
     const wordpressService = await this.k8sService.getService(
       namespace,
       `wordpress-${instanceId}`,
     );
     const nodePort = wordpressService.spec.ports.find(
-      (port) => port.port === 8081,
+      (port) => port.port === 80,
     )?.nodePort;
 
     // Install WordPress
     console.log('Installing WordPress...');
-    // await this.runKubectlCommand(
-    //   namespace,
-    //   podName,
-    //   `wp core install --url="http://49.12.148.222:${nodePort}" --title="${siteTitle}" --admin_user="${wpAdminUser}" --admin_password="${wpAdminPassword}" --admin_email="${wpAdminEmail}" --skip-email --allow-root`,
-    // );
+    await this.runKubectlCommand(
+      namespace,
+      podName,
+      `wp core install --url="http://49.12.148.222:${nodePort}" --title="${siteTitle}" --admin_user="${wpAdminUser}" --admin_password="${wpAdminPassword}" --admin_email="${wpAdminEmail}" --skip-email --allow-root`,
+    );
     console.log('WordPress installed.');
 
     // Activate necessary plugins
@@ -434,9 +500,12 @@ export class SetupService {
       namespace,
     );
     const wpfullIp = `${nodeIp}:${nodePort}`;
-    const phpAminIp = await this.k8sService.getPhpMyAdminNodePort(instanceId, namespace)
+    const phpAminIp = await this.k8sService.getPhpMyAdminNodePort(
+      instanceId,
+      namespace,
+    );
 
-    const phpAdminFullIp = `${nodeIp}:${phpAminIp}`
+    const phpAdminFullIp = `${nodeIp}:${phpAminIp}`;
 
     console.log(wpReplicaSet, sqlReplicaSet);
 
@@ -458,7 +527,7 @@ export class SetupService {
       readydbName,
       mysqlPassword,
       siteName,
-      phpAdminFullIp
+      phpAdminFullIp,
     );
 
     // Retrieve NodePort for WordPress (if exposed as LoadBalancer)
@@ -476,11 +545,18 @@ export class SetupService {
         throw new NotFoundException(`Setup with ID ${setupId} not found`);
       }
 
-      await execAsync(`kubectl delete deployment ${setup.wpDeployment} -n ${setup.nameSpace}`);
-      await execAsync(`kubectl delete deployment ${setup.sqlDeployment} -n ${setup.nameSpace}`);
+      await execAsync(
+        `kubectl delete deployment ${setup.wpDeployment} -n ${setup.nameSpace}`,
+      );
+      await execAsync(
+        `kubectl delete deployment ${setup.sqlDeployment} -n ${setup.nameSpace}`,
+      );
       return await this.setupRepository.deleteSetup(setupId);
     } catch (error) {
-      throw new InternalServerErrorException('Failed to delete setup', error.message);
+      throw new InternalServerErrorException(
+        'Failed to delete setup',
+        error.message,
+      );
     }
   }
 
@@ -504,20 +580,27 @@ export class SetupService {
 
       return `Successfully reset on port ${newSetup.wordpressUrl}`;
     } catch (error) {
-      throw new InternalServerErrorException('Failed to reset setup', error.message);
+      throw new InternalServerErrorException(
+        'Failed to reset setup',
+        error.message,
+      );
     }
   }
-
 
   async getDecryptedMysqlPassword(id: number) {
     try {
       const password = await this.setupRepository.getDecryptedMysqlPassword(id);
       if (!password) {
-        throw new NotFoundException(`MySQL password for setup with ID ${id} not found`);
+        throw new NotFoundException(
+          `MySQL password for setup with ID ${id} not found`,
+        );
       }
       return password;
     } catch (error) {
-      throw new InternalServerErrorException('Failed to decrypt MySQL password', error.message);
+      throw new InternalServerErrorException(
+        'Failed to decrypt MySQL password',
+        error.message,
+      );
     }
   }
 
