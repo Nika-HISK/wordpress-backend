@@ -82,4 +82,17 @@ export class BackupRepository {
     return await this.backupRepository.find()
   }
 
+  async findBySetupId(setupId: number): Promise<Backup[]> {
+    if (!setupId || isNaN(setupId)) {
+        throw new Error('Invalid setupId');
+    }
+
+    return this.backupRepository.createQueryBuilder('backup')
+        .where('backup.setupId = :setupId', { setupId })
+        .orderBy('backup.createdAt', 'DESC')
+        .getMany();
+}
+
+
+
 }

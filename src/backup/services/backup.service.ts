@@ -105,77 +105,79 @@ export class BackupService {
   
 
   async createManualBackupToPod(setupId: number, backupType: string) {
-    const whereGo = 'pod'
+    const whereGo = 'pod';
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
-    
+
     const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
     const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
     const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
-    
-    const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${zipFileName}` : `/tmp/${zipFileName}`;
-    
+    const backupDir = '/backups';
+
     await execAsync(`
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "apt update && apt install -y mariadb-client zip && wp db export '${backupName}' --allow-root && zip '${zipFileName}' '${backupName}'"
+      kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+        apt update && apt install -y mariadb-client zip &&
+        mkdir -p '${backupDir}' &&
+        wp db export '${backupName}' --allow-root &&
+        zip '${zipFileName}' '${backupName}' &&
+        mv '${zipFileName}' '${backupDir}'
+        rm '${backupName}'"
     `);
 
-    
-    await execAsync(`
-      kubectl cp "${setup.nameSpace}/${setup.podName}:/var/www/html/${zipFileName}" "${tempZipPath}"
-    `);
-
-    await execAsync(`rm -f ${tempZipPath}`);
-
-
+    // Record the backup in the database
     const backup = await this.backupRepository.createManulToPod(zipFileName, setupId, instanceId, backupType, whereGo);
 
     return backup;
-  
+}
+
+
+
+ async restoreManualFromPod(backupId: number) {
+  const backup = await this.backupRepository.findOne(backupId);
+  if (!backup) {
+    throw new Error('Invalid backup or backup type is not "pod"');
   }
 
-  async restoreManualFromPod(backupId: number) {
-    const backup = await this.backupRepository.findOne(backupId);
-    if (!backup) {
-      throw new Error('Invalid backup or backup type is not "pod"');
-    }
-  
-    const setup = await this.setupService.findOne(backup.setupId);
-    if (!setup) {
-      throw new Error('Setup not found for the backup');
-    }
-  
-    const tempUnzipPath =
-      os.platform() === 'win32'
-        ? `${process.env.TEMP}\\${backup.name.replace('.zip', '.sql')}`
-        : `/tmp/${backup.name.replace('.zip', '.sql')}`;
-  
-    const tempZipPath =
-      os.platform() === 'win32'
-        ? `${process.env.TEMP}\\${backup.name}`
-        : `/tmp/${backup.name}`;
-  
-    await execAsync(`
-      kubectl cp "${setup.nameSpace}/${setup.podName}:/var/www/html/${backup.name}" "${tempZipPath}"
-    `);
-  
-    await execAsync(`unzip -o ${tempZipPath} -d /tmp`);
-  
-    if (!fs.existsSync(tempUnzipPath)) {
-      throw new Error(`Unzipped SQL file not found at ${tempUnzipPath}`);
-    }
-  
-    await execAsync(`
-      kubectl cp "${tempUnzipPath}" "${setup.nameSpace}/${setup.podName}:/var/www/html/${backup.name.replace('.zip', '.sql')}"
-    `);
-  
-    await execAsync(`
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "wp db import /var/www/html/${backup.name.replace('.zip', '.sql')} --allow-root"
-    `);
-  
-    await execAsync(`rm -f ${tempZipPath} ${tempUnzipPath}`);
-  
-    return { message: 'Backup restored successfully from pod' };
+  const setup = await this.setupService.findOne(backup.setupId);
+  if (!setup) {
+    throw new Error('Setup not found for the backup');
   }
+
+  const backupFileName = backup.name;
+  const backupDir = '/backups';
+  const zipFilePath = `${backupDir}/${backupFileName}`;
+  const sqlFileName = backupFileName.replace('.zip', '.sql');
+  const sqlFilePath = `${backupDir}/${sqlFileName}`;
+
+  await execAsync(`
+    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+      if [ ! -f '${zipFilePath}' ]; then
+        echo 'Backup file not found in pod'; exit 1;
+      fi
+    "
+  `);
+
+  await execAsync(`
+    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+      apt update && apt install -y unzip &&
+      unzip -o '${zipFilePath}' -d '${backupDir}'"
+  `);
+
+  await execAsync(`
+    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+      wp db import '${sqlFilePath}' --allow-root"
+  `);
+
+  await execAsync(`
+    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+      rm -f '${zipFilePath}' '${sqlFilePath}'"
+  `);
+
+  await this.backupRepository.deleteBackup(backupId)
+
+  return { message: 'Backup restored successfully from pod' };
+}
+
   
   private scheduleDailyBackups() {
     const backupType = 'daily'
@@ -230,7 +232,7 @@ export class BackupService {
   
   async deleteBackupFromPod(backupId:number) {
 
-    const backup = await this.backupRepository.findOne(backupId)
+    const backup = await this.backupRepository.findOne(backupId)    
     const setup = await this.setupService.findOne(backup.setupId)
     const zippedName =  backup.name
     const sqlName = zippedName.replace('.zip', '.sql')
@@ -239,7 +241,7 @@ export class BackupService {
     
 
     await execAsync(`
-    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "rm ${zippedName} && rm ${sqlName}"
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "rm /backups/${zippedName}"
   `);
 
     await this.backupRepository.deleteBackup(backupId)
@@ -260,6 +262,47 @@ export class BackupService {
     const backups = await this.backupRepository.findAll();
     return backups.filter(backup => backup.whereGo === 's3');
   }
+
+
+  async createManualWithLimit(setupId: number, backupType: string) {
+    const whereGo = 'pod';
+    
+    const setup = await this.setupService.findOne(setupId);
+    
+    const instanceId = crypto.randomBytes(4).toString('hex');
+    
+
+    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
+    const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
+    const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
+    const backupDir = '/backups';
+
+    const existingBackups = await this.backupRepository.findBySetupId(setupId);
+    console.log(existingBackups);
+    
+    if (existingBackups.length >= 5) {
+        throw new Error('Cannot create more than 5 backups for this setup');
+    }
+
+    await execAsync(`
+      kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+        apt update && apt install -y mariadb-client zip &&
+        mkdir -p '${backupDir}' &&
+        wp db export '${backupName}' --allow-root &&
+        zip '${zipFileName}' '${backupName}' &&
+        mv '${zipFileName}' '${backupDir}' &&
+        rm '${backupName}'"
+    `);
+
+    const backup = await this.backupRepository.createManulToPod(zipFileName, setupId, instanceId, backupType, whereGo);
+
+    setTimeout(async () => {
+        await this.deleteBackupFromPod(backup.id);
+    }, 1209600000); 
+
+    return backup;
+}
+
   
   
 

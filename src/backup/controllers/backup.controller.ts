@@ -62,4 +62,11 @@ export class BackupController {
   async downloadBackup(@Param('backupId') backupId:string) {
     return await this.backupService.downloadBackup(Number(backupId))
   }
+
+  @Roles(Role.USER)    
+  @Post('ManualLimit/:setupId')
+  async createManualWithLimit(@Param('setupId') setupId:string) {
+    const backupType = 'manual'
+    return await this.backupService.createManualWithLimit(Number(setupId), backupType)
+  }
 }
