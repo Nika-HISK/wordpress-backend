@@ -108,74 +108,108 @@ export class BackupService {
     const whereGo = 'pod';
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
-
+  
     const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
     const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
     const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
     const backupDir = '/backups';
-
+  
+    // Create backup in the pod
     await execAsync(`
       kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
         apt update && apt install -y mariadb-client zip &&
         mkdir -p '${backupDir}' &&
         wp db export '${backupName}' --allow-root &&
-        zip '${zipFileName}' '${backupName}' &&
-        mv '${zipFileName}' '${backupDir}'
+        zip -r '${zipFileName}' '${backupName}' '${backupDir}/wp-content/plugins' '${backupDir}/wp-content/themes' '${backupDir}/wp-content/uploads' &&
+        mv '${zipFileName}' '${backupDir}' &&
         rm '${backupName}'"
     `);
-
+  
+    // Save the backup record
     const backup = await this.backupRepository.createManulToPod(zipFileName, setupId, instanceId, backupType, whereGo);
-
+  
     return backup;
-}
-
-
-
- async restoreManualFromPod(backupId: number) {
-  const backup = await this.backupRepository.findOne(backupId);
-  if (!backup) {
-    throw new Error('Invalid backup or backup type is not "pod"');
   }
+  
+  
+  
 
-  const setup = await this.setupService.findOne(backup.setupId);
-  if (!setup) {
-    throw new Error('Setup not found for the backup');
+
+
+  async restoreManualFromPod(backupId: number) {
+    // Retrieve the backup details from the repository
+    const backup = await this.backupRepository.findOne(backupId);
+    if (!backup) {
+      throw new Error('Invalid backup or backup type is not "pod"');
+    }
+  
+    // Retrieve the setup configuration for the backup
+    const setup = await this.setupService.findOne(backup.setupId);
+    if (!setup) {
+      throw new Error('Setup not found for the backup');
+    }
+  
+    // Define backup paths
+    const backupFileName = backup.name;
+    const backupDir = '/backups';
+    const zipFilePath = `${backupDir}/${backupFileName}`;
+    const sqlFileName = backupFileName.replace('.zip', '.sql');
+    const sqlFilePath = `${backupDir}/${sqlFileName}`;
+  
+    // Step 1: Check if the backup file exists in the pod
+    await execAsync(`
+      kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+        if [ ! -f '${zipFilePath}' ]; then
+          echo 'Backup file not found in pod'; exit 1;
+        fi
+      "
+    `);
+  
+    // Step 2: Unzip the backup file
+    await execAsync(`
+      kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+        apt update && apt install -y unzip &&
+        unzip -o '${zipFilePath}' -d '${backupDir}'"
+    `);
+  
+    // Step 3: Create directories if they don't exist and move files
+    await execAsync(`
+      kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+        mkdir -p '/var/www/html/wp-content/plugins' &&
+        mkdir -p '/var/www/html/wp-content/themes' &&
+        mkdir -p '/var/www/html/wp-content/uploads' &&
+        if [ -d '${backupDir}/wp-content/plugins' ]; then
+          mv '${backupDir}/wp-content/plugins/*' '/var/www/html/wp-content/plugins/';
+        fi &&
+        if [ -d '${backupDir}/wp-content/themes' ]; then
+          mv '${backupDir}/wp-content/themes/*' '/var/www/html/wp-content/themes/';
+        fi &&
+        if [ -d '${backupDir}/wp-content/uploads' ]; then
+          mv '${backupDir}/wp-content/uploads/*' '/var/www/html/wp-content/uploads/';
+        fi"
+    `);
+  
+    // Step 4: Import the database
+    await execAsync(`
+      kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+        wp db import '${sqlFilePath}' --allow-root"
+    `);
+  
+    // Step 5: Clean up temporary files
+    await execAsync(`
+      kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+        rm -f '${zipFilePath}' '${sqlFilePath}'"
+    `);
+  
+    // Step 6: Delete the backup record from the repository
+    await this.backupRepository.deleteBackup(backupId);
+  
+    return { message: 'Backup restored successfully from pod' };
   }
+  
+  
+  
 
-  const backupFileName = backup.name;
-  const backupDir = '/backups';
-  const zipFilePath = `${backupDir}/${backupFileName}`;
-  const sqlFileName = backupFileName.replace('.zip', '.sql');
-  const sqlFilePath = `${backupDir}/${sqlFileName}`;
-
-  await execAsync(`
-    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
-      if [ ! -f '${zipFilePath}' ]; then
-        echo 'Backup file not found in pod'; exit 1;
-      fi
-    "
-  `);
-
-  await execAsync(`
-    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
-      apt update && apt install -y unzip &&
-      unzip -o '${zipFilePath}' -d '${backupDir}'"
-  `);
-
-  await execAsync(`
-    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
-      wp db import '${sqlFilePath}' --allow-root"
-  `);
-
-  await execAsync(`
-    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
-      rm -f '${zipFilePath}' '${sqlFilePath}'"
-  `);
-
-  await this.backupRepository.deleteBackup(backupId)
-
-  return { message: 'Backup restored successfully from pod' };
-}
 
   
   private scheduleDailyBackups() {
