@@ -271,7 +271,7 @@ export class SetupService {
               },
               {
                 name: 'wordpress',
-                image: 'wordpress:php8.0-fpm',
+                image: 'wordpress:php8.1-fpm',
                 env: [
                   {
                     name: 'WORDPRESS_DB_HOST',
@@ -334,39 +334,45 @@ export class SetupService {
       apiVersion: 'v1',
       kind: 'ConfigMap',
       metadata: {
-        name: `nginx-config-${instanceId}`,
-        namespace,
+          name: `nginx-config-${instanceId}`,
+          namespace,
       },
       data: {
-        'default.conf': `
-          server {
-              listen 80;
-              server_name localhost;
-    
-              root /var/www/html;
-              index index.php index.html index.htm;
-    
-              # Main location block
-              location / {
-                  try_files $uri $uri/ /index.php?$args;
+          'default.conf': `
+              # Use existing log_format if defined elsewhere
+              access_log /var/log/nginx/access.log main;
+  
+              # Error log to capture 404 errors
+              error_log /var/log/nginx/error.log warn;
+  
+              server {
+                  listen 80;
+                  server_name localhost;
+      
+                  root /var/www/html;
+                  index index.php index.html index.htm;
+      
+                  # Main location block
+                  location / {
+                      try_files $uri $uri/ /index.php?$args;
+                  }
+      
+                  # PHP handling block
+                  location ~ \\.php$ {
+                      include fastcgi_params;
+                      fastcgi_pass 127.0.0.1:9000;
+                      fastcgi_index index.php;
+                      fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                  }
+      
+                  # Deny access to hidden files (e.g., .htaccess)
+                  location ~ /\\.ht {
+                      deny all;
+                  }
               }
-    
-              # PHP handling block
-              location ~ \\.php$ {
-                  include fastcgi_params;
-                  fastcgi_pass 127.0.0.1:9000;
-                  fastcgi_index index.php;
-                  fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-              }
-    
-              # Deny access to hidden files (e.g., .htaccess)
-              location ~ /\\.ht {
-                  deny all;
-              }
-          }
-        `,
+          `,
       },
-    };
+  };
     
     await this.k8sService.applyManifest(namespace, nginxConfigMapManifest);
     
@@ -378,7 +384,7 @@ export class SetupService {
       uniqueId,
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await new Promise((resolve) => setTimeout(resolve, 6000));
     await this.runKubectlCommand(namespace, podName, 'apt-get update');
     await this.runKubectlCommand(namespace, podName,'apt-get install -y curl');
     await this.runKubectlCommand(
