@@ -1,7 +1,8 @@
-import { IsEnum } from "class-validator";
+import { IsString } from "class-validator";
 
 
 
 export class CreateBackupDto {
-    
+    @IsString()
+    note:string
 }

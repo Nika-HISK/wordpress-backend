@@ -3,13 +3,13 @@ import { FilesService } from 'src/files/services/files.service';
 import { KubernetesService } from 'src/setup/services/kubernetes.service';
 import { BackupRepository } from '../repositories/backup.repository';
 import { SetupService } from 'src/setup/services/setup.service';
-import { CreateBackupDto } from '../dto/create-backup.dto';
-import { exec, spawn } from 'child_process';
+import { exec } from 'child_process';
 import * as crypto from 'crypto';
 import { promisify } from 'util';
 import { s3Service } from 'src/aws/services/s3.service';
 import * as fs from 'fs';
 import * as os from 'os';
+import { CreateBackupDto } from '../dto/create-backup.dto';
 
 
 const execAsync = promisify(exec);
@@ -28,7 +28,7 @@ export class BackupService {
   private backupInterval: NodeJS.Timeout;
 
 
-  async createManualToS3(setupId: number) {
+  async createManualToS3(setupId: number, createBackupDto: CreateBackupDto) {
     const whereGo = 's3'
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
@@ -57,7 +57,7 @@ export class BackupService {
     
     await execAsync(`rm -f ${tempZipPath}`);
 
-    const backup = await this.backupRepository.createManualS3Backup(zipFileName, setupId, instanceId, uploadResult.url, backupType, whereGo);
+    const backup = await this.backupRepository.createManualS3Backup(zipFileName, setupId, instanceId, uploadResult.url, backupType, whereGo, createBackupDto);
     
     return backup;
   }
@@ -124,7 +124,6 @@ export class BackupService {
         rm '${backupName}'"
     `);
 
-    // Record the backup in the database
     const backup = await this.backupRepository.createManulToPod(zipFileName, setupId, instanceId, backupType, whereGo);
 
     return backup;
@@ -216,7 +215,6 @@ export class BackupService {
       }, 86400000); 
     }, 3600000);  
   }
-  
 
 
   async createSixHourBackup(setupId: number) {
@@ -264,7 +262,7 @@ export class BackupService {
   }
 
 
-  async createManualWithLimit(setupId: number, backupType: string) {
+  async createManualWithLimit(setupId: number, backupType: string, createBackupDto: CreateBackupDto) {
     const whereGo = 'pod';
     
     const setup = await this.setupService.findOne(setupId);
@@ -281,7 +279,7 @@ export class BackupService {
     console.log(existingBackups);
     
     if (existingBackups.length >= 5) {
-        throw new Error('Cannot create more than 5 backups for this setup');
+        return {message: 'Cannot create more than 5 backups for this setup'}
     }
 
     await execAsync(`
@@ -294,7 +292,7 @@ export class BackupService {
         rm '${backupName}'"
     `);
 
-    const backup = await this.backupRepository.createManulToPod(zipFileName, setupId, instanceId, backupType, whereGo);
+    const backup = await this.backupRepository.createManulToPodWithLimit(zipFileName, setupId, instanceId, backupType, whereGo, createBackupDto);
 
     setTimeout(async () => {
         await this.deleteBackupFromPod(backup.id);
@@ -306,5 +304,21 @@ export class BackupService {
   
   
 
+findManualBackups() {
+  return this.backupRepository.findManualBackups()
+}
+
+findDailyBackups() {
+  return this.backupRepository.findDailyBackups()
+}
+
+findHourlyBackups() {
+  return this.backupRepository.findHourlyBackups()
+}
+
+findSixHourlyBackups() {
+  return this.backupRepository.findSixHourlyBackups()
+
+}
   
 }

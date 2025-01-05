@@ -10,12 +10,12 @@ export class BackupController {
 
   @Roles(Role.USER)
   @Post('ManualToS3/:setupId')
-  async createManualToS3(@Param('setupId') setupId:string) {
-    return await this.backupService.createManualToS3(Number(setupId))
+  async createManualToS3(@Param('setupId') setupId:string, @Body() createBackupDto: CreateBackupDto) {
+    return await this.backupService.createManualToS3(Number(setupId), createBackupDto)
   }
 
   @Roles(Role.USER)
-  @Post('restoreBackupFromS3/:backupId')
+  @Post('restoreFromS3/:backupId')
   async restoreBackupFromS3(@Param('backupId') backupId:string) {
     return await this.backupService.restoreBackupFromS3(Number(backupId))
   }
@@ -65,8 +65,34 @@ export class BackupController {
 
   @Roles(Role.USER)    
   @Post('ManualLimit/:setupId')
-  async createManualWithLimit(@Param('setupId') setupId:string) {
+  async createManualWithLimit(@Param('setupId') setupId:string,  @Body() createBackupDto: CreateBackupDto) {
     const backupType = 'manual'
-    return await this.backupService.createManualWithLimit(Number(setupId), backupType)
+    return await this.backupService.createManualWithLimit(Number(setupId), backupType, createBackupDto)
   }
+
+  @Roles(Role.USER)
+  @Get('manual')
+  async findManualBackups() {
+    return await this.backupService.findManualBackups()
+  }
+
+
+  @Roles(Role.USER)
+  @Get('daily')
+  async findDailyBackups() {
+    return await this.backupService.findDailyBackups()
+  }
+
+  @Roles(Role.USER)
+  @Get('hourly')
+  async findHourlyBackups() {
+    return await this.backupService.findHourlyBackups()
+  }
+
+  @Roles(Role.USER)
+  @Get('six-hourly')
+  async findSixHourlyBackups() {
+    return await this.backupService.findSixHourlyBackups()
+  }
+
 }

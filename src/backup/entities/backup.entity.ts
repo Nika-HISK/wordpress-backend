@@ -1,6 +1,6 @@
 import { baseEntity } from 'src/base/entities/base.entity';
 import { Setup } from 'src/setup/entities/setup.entity';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne } from 'typeorm';
 
 @Entity()
 export class Backup extends baseEntity {
@@ -25,4 +25,7 @@ export class Backup extends baseEntity {
 
   @Column({type: 'enum', enum:['s3', 'pod']})
   whereGo: string
+
+  @Column({nullable:true})
+  note: string
 }
