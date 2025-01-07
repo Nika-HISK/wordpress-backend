@@ -265,7 +265,11 @@ export class SetupService {
                 image: 'nginx:latest',
                 ports: [{ containerPort: 80 }],
                 volumeMounts: [
-                  { name: 'wordpress-content', mountPath: '/var/www/html' },
+                  {
+                    name: 'wordpress-content',
+                    mountPath: '/var/www/html',
+                    readOnly: true,
+                  },
                   { name: 'nginx-config', mountPath: '/etc/nginx/conf.d' },
                 ],
               },
@@ -334,11 +338,11 @@ export class SetupService {
       apiVersion: 'v1',
       kind: 'ConfigMap',
       metadata: {
-          name: `nginx-config-${instanceId}`,
-          namespace,
+        name: `nginx-config-${instanceId}`,
+        namespace,
       },
       data: {
-          'default.conf': `
+        'default.conf': `
               # Use existing log_format if defined elsewhere
               access_log /var/log/nginx/access.log main;
   
@@ -347,7 +351,7 @@ export class SetupService {
   
               server {
                   listen 80;
-                  server_name localhost;
+                  server_name _;
       
                   root /var/www/html;
                   index index.php index.html index.htm;
@@ -372,10 +376,9 @@ export class SetupService {
               }
           `,
       },
-  };
-    
+    };
+
     await this.k8sService.applyManifest(namespace, nginxConfigMapManifest);
-    
 
     // Step 5: Save Pod Name in the Database
     const podName = await this.k8sService.findPodByLabel(
@@ -384,15 +387,15 @@ export class SetupService {
       uniqueId,
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 6000));
+    await new Promise((resolve) => setTimeout(resolve, 10000));
     await this.runKubectlCommand(namespace, podName, 'apt-get update');
-    await this.runKubectlCommand(namespace, podName,'apt-get install -y curl');
+    await this.runKubectlCommand(namespace, podName, 'apt-get install -y curl');
     await this.runKubectlCommand(
       namespace,
       podName,
       'curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar',
     );
-    await this.runKubectlCommand(namespace, podName,'chmod +x wp-cli.phar');
+    await this.runKubectlCommand(namespace, podName, 'chmod +x wp-cli.phar');
     await this.runKubectlCommand(
       namespace,
       podName,
