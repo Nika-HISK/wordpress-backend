@@ -1,3 +1,4 @@
+import { Json } from 'aws-sdk/clients/robomaker';
 import { baseEntity } from 'src/base/entities/base.entity';
 import { Setup } from 'src/setup/entities/setup.entity';
 import { Entity, Column, ManyToOne } from 'typeorm';
@@ -28,4 +29,10 @@ export class Backup extends baseEntity {
 
   @Column({nullable:true})
   note: string
+
+  @Column({ type: 'json'})
+  plugins: string[];
+
+  @Column({ type: 'json' })
+  themes: string[]
 }

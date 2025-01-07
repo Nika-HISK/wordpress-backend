@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { CreateBackupDto } from '../dto/create-backup.dto';
 import { SetupService } from 'src/setup/services/setup.service';
 import { exec } from 'child_process';
+import { Json } from 'aws-sdk/clients/robomaker';
 const execAsync = promisify(exec);
 
 
@@ -38,7 +39,7 @@ export class BackupRepository {
   }
 
 
-  async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string) {
+  async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, plugins: Json, themes: Json) {
   
 
     const newBackup = new Backup()
@@ -47,6 +48,8 @@ export class BackupRepository {
     newBackup.instanceId = instanceId
     newBackup.type = backupType
     newBackup.whereGo = whereGo
+    newBackup.plugins = [plugins]
+    newBackup.themes = [themes]
   
     return await this.backupRepository.save(newBackup)
   

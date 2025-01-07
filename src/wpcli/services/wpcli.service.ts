@@ -123,6 +123,22 @@ export class wpcliService {
     return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
 
+  async wpThemeDisable(setupId: number, theme: string) {
+    if (!theme) {
+      throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);
+    }
+
+    const command = `wp theme disable ${theme} --allow-root`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
+
+  }
+
   async wpThemeDelete(setupId: number, theme: string): Promise<string> {
     if (!theme) {
       throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);
@@ -228,6 +244,59 @@ export class wpcliService {
     return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
   }
 
+  async wpPluginInstall(setupId: number, plugin: string) {
+    if (!plugin) {
+      throw new HttpException('Plugin name is required', HttpStatus.BAD_REQUEST);
+    }
+  
+    const commandInstall = `wp plugin install ${plugin} --allow-root`;
+    const commandSetPermissions = `chown -R www-data:www-data /var/www/html/wp-content/plugins/${plugin}`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    try {
+      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, commandInstall);
+      console.log(`Plugin ${plugin} installed successfully`);
+  
+      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, commandSetPermissions);
+      console.log(`Permissions set for plugin ${plugin}`);
+  
+      const commandActivate = `wp plugin activate ${plugin} --allow-root`;
+      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, commandActivate);
+      console.log(`Plugin ${plugin} activated`);
+  
+    } catch (error) {
+      throw new Error(`Failed to install and configure plugin: ${error.message}`);
+    }
+  }
+  
+  
+  
+  
+  
+  
+  
+
+  async wpThemeInstall(setupId: number, theme: string) {
+    if (!theme) {
+      throw new HttpException('theme name is required', HttpStatus.BAD_REQUEST);
+    }
+
+    const command = `wp theme install ${theme} --allow-root`;
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new Error(`Setup with ID ${setupId} not found`);
+    }
+  
+    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
+
+
+
+  }
 
   async wpPluginUpdate(setupId: number, plugin: string): Promise<string> {
     if (!plugin) {
