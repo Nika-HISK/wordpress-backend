@@ -49,7 +49,6 @@ export class BackupService {
     await execAsync(`
       kubectl cp "${setup.nameSpace}/${setup.podName}:/var/www/html/${zipFileName}" "${tempZipPath}"
     `);
-    // nikoloz -c7c40fdf.zip
     const fileContent = fs.readFileSync(tempZipPath);
     const uploadResult = await this.filesService.uploadFile({
       originalname: zipFileName,
@@ -121,7 +120,7 @@ export class BackupService {
     const wordpressDir = '/var/www/html'; 
 
     await execAsync(`
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
         apt update && apt install -y mariadb-client zip &&
         mkdir -p '${backupDir}' &&
         
@@ -148,15 +147,16 @@ export class BackupService {
 
 
 
+
 async restoreManualFromPod(backupId: number) {
   const backup = await this.backupRepository.findOne(backupId);
   if (!backup) {
-    throw new Error('Invalid backup or backup type is not "pod"');
+      throw new Error('Invalid backup or backup type is not "pod"');
   }
 
   const setup = await this.setupService.findOne(backup.setupId);
   if (!setup) {
-    throw new Error('Setup not found for the backup');
+      throw new Error('Setup not found for the backup');
   }
 
   const backupFileName = backup.name;
@@ -166,7 +166,7 @@ async restoreManualFromPod(backupId: number) {
   const sqlFilePath = `${backupDir}/${sqlFileName}`;
 
   await execAsync(`
-    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
       if [ ! -f '${zipFilePath}' ]; then
         echo 'Backup file not found in pod'; exit 1;
       fi
@@ -174,13 +174,13 @@ async restoreManualFromPod(backupId: number) {
   `);
 
   await execAsync(`
-    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
       apt update && apt install -y unzip &&
       unzip -o '${zipFilePath}' -d '${backupDir}'"
   `);
 
   await execAsync(`
-    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
       rm -rf /var/www/html/wp-content /var/www/html/wp-admin /var/www/html/wp-includes /var/www/html/wp-config.php /var/www/html/wp-config-sample.php &&
       mv '${backupDir}/wp-content' /var/www/html/ &&
       mv '${backupDir}/wp-admin' /var/www/html/ &&
@@ -190,17 +190,17 @@ async restoreManualFromPod(backupId: number) {
   `);
 
   await execAsync(`
-    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
       chown -R www-data:www-data /var/www/html/wp-content /var/www/html/wp-content/plugins /var/www/html/wp-content/themes /var/www/html/wp-includes /var/www/html/wp-admin /var/www/html/wp-config.php /var/www/html/wp-config-sample.php"
   `);
 
   await execAsync(`
-    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
       wp db import '${sqlFilePath}' --allow-root"
   `);
 
   await execAsync(`
-    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
       rm -f '${zipFilePath}' '${sqlFilePath}'"
   `);
 
@@ -208,6 +208,7 @@ async restoreManualFromPod(backupId: number) {
 
   return { message: 'Backup restored successfully from pod' };
 }
+
 
 
 
