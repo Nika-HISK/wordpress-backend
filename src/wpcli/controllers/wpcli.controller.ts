@@ -216,7 +216,7 @@ export class wpcliController {
   @Patch('plugin/disable/:setupId')
   async wpPluginDeactivate(
     @Param('setupId') setupId: number,
-    @Body('plugin') plugin: string[],
+    @Body('plugins') plugin: string[],
   ) {
     try {
       return await this.wpCliService.wpPluginDeactivate(setupId, plugin);

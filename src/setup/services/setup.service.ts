@@ -387,7 +387,7 @@ export class SetupService {
       uniqueId,
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+    await new Promise((resolve) => setTimeout(resolve, 12000));
     await this.runKubectlCommand(namespace, podName, 'apt-get update');
     await this.runKubectlCommand(namespace, podName, 'apt-get install -y curl');
     await this.runKubectlCommand(

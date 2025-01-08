@@ -43,6 +43,8 @@ export class SetupController {
     }
   }
 
+  
+
   @Throttle({ default: { limit: 1, ttl: 2000 } })
   @Roles(Role.USER)
   @Post('resetSetup/:id')
