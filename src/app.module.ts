@@ -13,6 +13,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { YmlModule } from './yml/yml.module';
 import { DockerModule } from './docker/docker.module';
 import { HelperModule } from './helper/helper.module';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [ThrottlerModule.forRoot([
@@ -52,6 +53,7 @@ import { HelperModule } from './helper/helper.module';
     YmlModule,
     DockerModule,
     HelperModule,
+    BackupModule,
   ],
   controllers: [AppController],
   providers: [AppService],
