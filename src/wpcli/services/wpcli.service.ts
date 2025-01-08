@@ -282,21 +282,33 @@ export class wpcliService {
 
   async wpThemeInstall(setupId: number, theme: string) {
     if (!theme) {
-      throw new HttpException('theme name is required', HttpStatus.BAD_REQUEST);
+      throw new HttpException('Theme name is required', HttpStatus.BAD_REQUEST);
     }
-
-    const command = `wp theme install ${theme} --allow-root`;
+  
+    const commandInstall = `wp theme install ${theme} --allow-root`;
+    const commandSetPermissions = `chown -R www-data:www-data /var/www/html/wp-content/themes/${theme}`;
   
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {
       throw new Error(`Setup with ID ${setupId} not found`);
     }
   
-    return this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, command);
-
-
-
+    try {
+      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, commandInstall);
+      console.log(`Theme ${theme} installed successfully`);
+  
+      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, commandSetPermissions);
+      console.log(`Permissions set for theme ${theme}`);
+  
+      const commandActivate = `wp theme activate ${theme} --allow-root`;
+      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, commandActivate);
+      console.log(`Theme ${theme} activated`);
+  
+    } catch (error) {
+      throw new Error(`Failed to install and configure theme: ${error.message}`);
+    }
   }
+  
 
   async wpPluginUpdate(setupId: number, plugin: string): Promise<string> {
     if (!plugin) {

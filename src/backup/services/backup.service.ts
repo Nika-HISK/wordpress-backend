@@ -146,6 +146,8 @@ export class BackupService {
 
   const plugins = await this.wpCliService.wpPluginList(backup.setupId)
 
+try {
+
 
   for(let i = 0; i < plugins.length; i++) {
     await this.wpCliService.wpPluginDelete(backup.setupId, plugins[i]['name'])
@@ -168,19 +170,38 @@ export class BackupService {
   }
 
 
-  // const themes = await this.wpCliService.wpThemeList(backup.setupId)
+} catch(error) {
+  console.log(`could not fully restore plugin for this ${error}`);
+  
+}
 
-  // for(let i = 0; i < themes.length; i++) {
-  //   await this.wpCliService.wpThemeDelete(backup.setupId, themes[i]['name'])
-  // }
+  const themes = await this.wpCliService.wpThemeList(backup.setupId)
+  let activatedTheme = {}
 
-  // for(let i = 0; backup.themes.length; i++) {
-  //   for(let j = 0; j < backup.themes[i].length; j++) {
-  //     const previousThemeName = backup.themes[i][j]['name']
-  //     await this.wpCliService.wpThemeInstall(backup.setupId, previousThemeName)
-  //   }
-  // }
 
+  try {
+    for(let i = 0; i < themes.length; i++) {
+      if(themes[i]['status'] != 'active') {
+        await this.wpCliService.wpThemeDelete(backup.setupId, themes[i]['name'])
+      } 
+  
+      if(themes[i]['status'] == 'active') {
+        activatedTheme = themes[i]
+      }
+    }
+  
+    for(let i = 0; i <=  backup.themes.length; i++) {
+      for(let j = 0; j <= backup.themes[i].length; j++) {
+        const previousThemeName = backup.themes[i][j]['name']
+        await this.wpCliService.wpThemeInstall(backup.setupId, previousThemeName)
+      }
+  
+    }
+  } catch(error) {
+    console.log(`could not restore fullly because of this ${error}`);
+    
+  }
+  
 
   const setup = await this.setupService.findOne(backup.setupId);
   if (!setup) {
