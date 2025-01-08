@@ -111,97 +111,48 @@ export class BackupService {
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
 
-    const plugins = await this.wpCliService.wpPluginList(setupId)
-    
-    const themes = await this.wpCliService.wpThemeList(setupId)
+    const plugins = await this.wpCliService.wpPluginList(setupId);
+    const themes = await this.wpCliService.wpThemeList(setupId);
 
-    
-    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
-    const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
+    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-');
     const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
+    const sqlFileName = `${sanitizedSiteName}-${instanceId}.sql`;
     const backupDir = '/backups';
+    const wordpressDir = '/var/www/html'; 
 
     await execAsync(`
-      kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "
         apt update && apt install -y mariadb-client zip &&
         mkdir -p '${backupDir}' &&
-        wp db export '${backupName}' --allow-root &&
-        zip '${zipFileName}' '${backupName}' &&
-        mv '${zipFileName}' '${backupDir}'
-        rm '${backupName}'"
+        
+        # Export the database directly to the backup directory
+        wp db export '${backupDir}/${sqlFileName}' --allow-root &&
+        
+        # Zip the entire WordPress directory and move it to the backup directory
+        cd ${wordpressDir} &&
+        zip -r '${backupDir}/${zipFileName}' ."
     `);
 
-    const backup = await this.backupRepository.createManulToPod(zipFileName, setupId, instanceId, backupType, whereGo, plugins, themes);
+    const backup = await this.backupRepository.createManulToPod(
+        zipFileName,
+        setupId,
+        instanceId,
+        backupType,
+        whereGo,
+        plugins,
+        themes,
+    );
 
     return backup;
 }
 
 
- async restoreManualFromPod(backupId: number) {
+
+async restoreManualFromPod(backupId: number) {
   const backup = await this.backupRepository.findOne(backupId);
   if (!backup) {
     throw new Error('Invalid backup or backup type is not "pod"');
   }
-
-
-  const plugins = await this.wpCliService.wpPluginList(backup.setupId)
-
-try {
-
-
-  for(let i = 0; i < plugins.length; i++) {
-    await this.wpCliService.wpPluginDelete(backup.setupId, plugins[i]['name'])
-  }
-
-
-
-  
-  for(let i = 0; i < backup.plugins.length; i++) {
-    for(let j = 0; j < backup.plugins[i].length; j++) {
-        const previousPluginName = backup.plugins[i][j]['name'] 
-        if(previousPluginName == 'hello') {
-          await this.wpCliService.wpPluginInstall(backup.setupId, 'hello-dolly')
-        } else {
-          await this.wpCliService.wpPluginInstall(backup.setupId, previousPluginName)
-        }
-
-    }
-    
-  }
-
-
-} catch(error) {
-  console.log(`could not fully restore plugin for this ${error}`);
-  
-}
-
-  const themes = await this.wpCliService.wpThemeList(backup.setupId)
-  let activatedTheme = {}
-
-
-  try {
-    for(let i = 0; i < themes.length; i++) {
-      if(themes[i]['status'] != 'active') {
-        await this.wpCliService.wpThemeDelete(backup.setupId, themes[i]['name'])
-      } 
-  
-      if(themes[i]['status'] == 'active') {
-        activatedTheme = themes[i]
-      }
-    }
-  
-    for(let i = 0; i <=  backup.themes.length; i++) {
-      for(let j = 0; j <= backup.themes[i].length; j++) {
-        const previousThemeName = backup.themes[i][j]['name']
-        await this.wpCliService.wpThemeInstall(backup.setupId, previousThemeName)
-      }
-  
-    }
-  } catch(error) {
-    console.log(`could not restore fullly because of this ${error}`);
-    
-  }
-  
 
   const setup = await this.setupService.findOne(backup.setupId);
   if (!setup) {
@@ -230,6 +181,21 @@ try {
 
   await execAsync(`
     kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+      rm -rf /var/www/html/wp-content /var/www/html/wp-admin /var/www/html/wp-includes /var/www/html/wp-config.php /var/www/html/wp-config-sample.php &&
+      mv '${backupDir}/wp-content' /var/www/html/ &&
+      mv '${backupDir}/wp-admin' /var/www/html/ &&
+      mv '${backupDir}/wp-includes' /var/www/html/ &&
+      mv '${backupDir}/wp-config.php' /var/www/html/ &&
+      mv '${backupDir}/wp-config-sample.php' /var/www/html/"
+  `);
+
+  await execAsync(`
+    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+      chown -R www-data:www-data /var/www/html/wp-content /var/www/html/wp-content/plugins /var/www/html/wp-content/themes /var/www/html/wp-includes /var/www/html/wp-admin /var/www/html/wp-config.php /var/www/html/wp-config-sample.php"
+  `);
+
+  await execAsync(`
+    kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
       wp db import '${sqlFilePath}' --allow-root"
   `);
 
@@ -238,10 +204,16 @@ try {
       rm -f '${zipFilePath}' '${sqlFilePath}'"
   `);
 
-  await this.backupRepository.deleteBackup(backupId)
+  await this.backupRepository.deleteBackup(backupId);
 
   return { message: 'Backup restored successfully from pod' };
 }
+
+
+
+
+
+
 
   
   
@@ -354,7 +326,7 @@ try {
     }
 
     await execAsync(`
-      kubectl exec -n ${setup.nameSpace} ${setup.podName} -- sh -c "
+      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "
         apt update && apt install -y mariadb-client zip &&
         mkdir -p '${backupDir}' &&
         wp db export '${backupName}' --allow-root &&
