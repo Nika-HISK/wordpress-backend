@@ -9,6 +9,7 @@ import {
   BadRequestException,
   InternalServerErrorException,
   NotFoundException,
+  Query,
 } from '@nestjs/common';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupService } from '../services/setup.service';
@@ -43,7 +44,17 @@ export class SetupController {
     }
   }
 
-  
+  @Roles(Role.USER)
+  @Get(':namespace/logs/:podName')
+  async getLogs(
+    @Param('namespace') namespace: string,
+    @Param('podName') podName: string,
+    @Query('logFile') logFile: 'access.log' | 'error.log',
+    @Query('limit') limit: string = '100',
+  ) {
+    const lineLimit = parseInt(limit, 10);
+    return await this.setupService.getPodLogFile(namespace, podName, logFile, lineLimit);
+  }
 
   @Throttle({ default: { limit: 1, ttl: 2000 } })
   @Roles(Role.USER)
