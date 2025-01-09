@@ -66,7 +66,7 @@ export class BackupController {
   @Roles(Role.USER)    
   @Post('ManualLimit/:setupId')
   async createManualWithLimit(@Param('setupId') setupId:string,  @Body() createBackupDto: CreateBackupDto) {
-    const backupType = 'manual'
+    const backupType = 'manualLimited' 
     return await this.backupService.createManualWithLimit(Number(setupId), backupType, createBackupDto)
   }
 
@@ -93,6 +93,13 @@ export class BackupController {
   @Get('six-hourly')
   async findSixHourlyBackups() {
     return await this.backupService.findSixHourlyBackups()
+  }
+
+
+  @Roles(Role.USER)
+  @Get('manualLimited')
+  async findManualLimited() {
+    return await this.backupService.findManualLimited()
   }
 
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { FilesService } from 'src/files/services/files.service';
 import { KubernetesService } from 'src/setup/services/kubernetes.service';
 import { BackupRepository } from '../repositories/backup.repository';
@@ -307,19 +307,7 @@ async restoreManualFromPod(backupId: number) {
 }
 
 
-
-
-
-
-
-
-  
-  
-  
-
-
-  
-  private scheduleDailyBackups() {
+private scheduleDailyBackups() {
     const backupType = 'daily'
     this.backupInterval = setInterval(async () => {
       console.log('Starting daily backup process...');
@@ -380,8 +368,8 @@ async restoreManualFromPod(backupId: number) {
     
 
     await execAsync(`
-    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "rm /backups/${zippedName}"
-  `);
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "rm /backups/${zippedName} && rm /backups/${sqlName}"
+    `);
 
     await this.backupRepository.deleteBackup(backupId)
 
@@ -403,45 +391,63 @@ async restoreManualFromPod(backupId: number) {
   }
 
 
+
   async createManualWithLimit(setupId: number, backupType: string, createBackupDto: CreateBackupDto) {
-    const whereGo = 'pod';
-    
-    const setup = await this.setupService.findOne(setupId);
-    
-    const instanceId = crypto.randomBytes(4).toString('hex');
-    
-
-    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
-    const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
-    const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
-    const backupDir = '/backups';
-
     const existingBackups = await this.backupRepository.findBySetupId(setupId);
-    console.log(existingBackups);
     
     if (existingBackups.length >= 5) {
-        return {message: 'Cannot create more than 5 backups for this setup'}
+        throw new HttpException('You cannot create more than 5 backups', HttpStatus.BAD_REQUEST);
     }
 
-    await execAsync(`
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "
-        apt update && apt install -y mariadb-client zip &&
-        mkdir -p '${backupDir}' &&
-        wp db export '${backupName}' --allow-root &&
-        zip '${zipFileName}' '${backupName}' &&
-        mv '${zipFileName}' '${backupDir}' &&
-        rm '${backupName}'"
-    `);
-
-    const backup = await this.backupRepository.createManulToPodWithLimit(zipFileName, setupId, instanceId, backupType, whereGo, createBackupDto);
+    const backup = await this.createManualBackupToPodForLimit(setupId, backupType, createBackupDto);
 
     setTimeout(async () => {
-        await this.deleteBackupFromPod(backup.id);
-    }, 1209600000); 
+        try {
+            await this.deleteBackupFromPod(backup.id);
+        } catch (error) {
+            console.error('Error deleting backup:', error);
+        }
+    }, 1209600000 );
 
     return backup;
 }
 
+
+  async createManualBackupToPodForLimit(setupId: number, backupType: string, createBackupDto: CreateBackupDto) {
+    const whereGo = 'pod';
+    const setup = await this.setupService.findOne(setupId);
+    const instanceId = crypto.randomBytes(4).toString('hex');
+
+    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-');
+    const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
+    const sqlFileName = `${sanitizedSiteName}-${instanceId}.sql`;
+    const backupDir = '/backups';
+    const wordpressDir = '/var/www/html'; 
+
+    await execAsync(`
+      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
+        apt update && apt install -y mariadb-client zip &&
+        mkdir -p '${backupDir}' &&
+        
+        # Export the database directly to the backup directory
+        wp db export '${backupDir}/${sqlFileName}' --allow-root &&
+        
+        # Zip the entire WordPress directory and move it to the backup directory
+        cd ${wordpressDir} &&
+        zip -r '${backupDir}/${zipFileName}' ."
+    `);
+
+    const backup = await this.backupRepository.createManulToPodWithLimit(
+        zipFileName,
+        setupId,
+        instanceId,
+        backupType,
+        whereGo,
+        createBackupDto,
+    );
+
+    return backup;
+}
   
   
 
@@ -459,7 +465,11 @@ findHourlyBackups() {
 
 findSixHourlyBackups() {
   return this.backupRepository.findSixHourlyBackups()
-
 }
-  
+
+
+findManualLimited() {
+  return this.backupRepository.findManualLimited()
+}
+
 }

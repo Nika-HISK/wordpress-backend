@@ -119,4 +119,10 @@ export class BackupRepository {
     return this.backupRepository.find({where: {type: 'six-hourly'}})
 
   }
+
+
+  findManualLimited() {
+    return this.backupRepository.find({where: {type: 'manualLimited'}})
+
+  }
 }

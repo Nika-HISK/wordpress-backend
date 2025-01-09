@@ -25,7 +25,7 @@ export class Backup extends baseEntity {
   s3SqlUrl:string
 
 
-  @Column({type: 'enum', enum:[ 'daily', 'hourly', 'six-hourly', 'manual']})
+  @Column({type: 'enum', enum:[ 'daily', 'hourly', 'six-hourly', 'manual', 'manualLimited']})
   type: string
 
   @Column({type: 'enum', enum:['s3', 'pod']})
@@ -34,9 +34,9 @@ export class Backup extends baseEntity {
   @Column({nullable:true})
   note: string
 
-  @Column({ type: 'json'})
+  @Column({ type: 'json', nullable: true})
   plugins: string[];
 
-  @Column({ type: 'json' })
+  @Column({ type: 'json', nullable: true})
   themes: string[]
 }
