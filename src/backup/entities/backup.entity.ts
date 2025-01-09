@@ -18,8 +18,12 @@ export class Backup extends baseEntity {
   @ManyToOne(() => Setup, (setup) => setup.backups)
   setup:Setup
 
-  @Column({length:'1000', default:''})
-  s3Url:string
+  @Column({length:'1000', default:'', nullable:true})
+  s3ZippedUrl:string
+
+  @Column({length:'1000', default:'', nullable:true})
+  s3SqlUrl:string
+
 
   @Column({type: 'enum', enum:[ 'daily', 'hourly', 'six-hourly', 'manual']})
   type: string

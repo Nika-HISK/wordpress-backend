@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { CreateBackupDto } from '../dto/create-backup.dto';
 import { wpcliService } from 'src/wpcli/services/wpcli.service';
+import { Readable } from 'stream';
 
 
 const execAsync = promisify(exec);
@@ -30,79 +31,175 @@ export class BackupService {
   private backupInterval: NodeJS.Timeout;
 
 
-  async createManualToS3(setupId: number, createBackupDto: CreateBackupDto) {
-    const whereGo = 's3'
-    const setup = await this.setupService.findOne(setupId);
-    const instanceId = crypto.randomBytes(4).toString('hex');
-    const backupType = 'manual'
-    
-    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
-    const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
-    const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
-    
-    const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${zipFileName}` : `/tmp/${zipFileName}`;
-    
-    await execAsync(`
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "apt update && apt install -y mariadb-client zip && wp db export '${backupName}' --allow-root && zip '${zipFileName}' '${backupName}'"
-    `);
-    
-    await execAsync(`
-      kubectl cp "${setup.nameSpace}/${setup.podName}:/var/www/html/${zipFileName}" "${tempZipPath}"
-    `);
-    const fileContent = fs.readFileSync(tempZipPath);
-    const uploadResult = await this.filesService.uploadFile({
+  
+async createManualToS3(setupId: number, createBackupDto: CreateBackupDto) {
+  const whereGo = 's3';
+  const backupType = 'manual'
+  const setup = await this.setupService.findOne(setupId);
+  const instanceId = crypto.randomBytes(4).toString('hex');
+
+  const plugins = await this.wpCliService.wpPluginList(setupId);
+  const themes = await this.wpCliService.wpThemeList(setupId);
+
+  const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-');
+  const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
+  const sqlFileName = `${sanitizedSiteName}-${instanceId}.sql`;
+  const backupDir = '/backups';
+  const wordpressDir = '/var/www/html'; 
+
+  await execAsync(`
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
+      apt update && apt install -y mariadb-client zip &&
+      mkdir -p '${backupDir}' &&
+      
+      # Export the database directly to the backup directory
+      wp db export '${backupDir}/${sqlFileName}' --allow-root &&
+      
+      # Zip the entire WordPress directory and move it to the backup directory
+      cd ${wordpressDir} &&
+      zip -r '${backupDir}/${zipFileName}' ."
+  `);
+
+  const zipFileMock: Express.Multer.File = {
+      fieldname: 'backup',
       originalname: zipFileName,
+      encoding: '7bit',
       mimetype: 'application/zip',
-      buffer: fileContent,
-    } as Express.Multer.File);
-    
-    await execAsync(`rm -f ${tempZipPath}`);
+      size: 123456, 
+      path: `${backupDir}/${zipFileName}`,
+      destination: backupDir,
+      filename: zipFileName,
+      buffer: Buffer.from(''), 
+      stream: Readable.from([])
+  };
 
-    const backup = await this.backupRepository.createManualS3Backup(zipFileName, setupId, instanceId, uploadResult.url, backupType, whereGo, createBackupDto);
-    
-    return backup;
-  }
+  const sqlFileMock: Express.Multer.File = {
+      fieldname: 'backup',
+      originalname: sqlFileName,
+      encoding: '7bit',
+      mimetype: 'application/sql',
+      size: 789012, 
+      path: `${backupDir}/${sqlFileName}`,
+      destination: backupDir,
+      filename: sqlFileName,
+      buffer: Buffer.from(''), 
+      stream: Readable.from([])
+  };
+
+  const zipFile = await this.filesService.uploadFile(zipFileMock);
+  const sqlFile = await this.filesService.uploadFile(sqlFileMock);
+
+  const zipFilePresignedUrl = await this.s3Service.getPresignedUrl(zipFile.key);
+  const sqlFilePresignedUrl = await this.s3Service.getPresignedUrl(sqlFile.key);
+
+  const backup = await this.backupRepository.createManualS3Backup(
+      zipFileName,
+      setupId,
+      instanceId,
+      zipFilePresignedUrl,
+      backupType,
+      whereGo,
+      createBackupDto,
+      plugins,
+      themes,
+      sqlFilePresignedUrl
+  );
+
+
+  await execAsync(`
+  kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
+    rm /backups/${zipFileName} && 
+    rm /backups/${sqlFileName}
+  "
+  `)
+
+  return {
+      backup,
+      zipFilePresignedUrl,
+      sqlFilePresignedUrl,
+  };
+}
+
+
+
+
   
   
 
-  async restoreBackupFromS3(backupId: number) {
-    const backup = await this.backupRepository.findOne(backupId);
-    const setup = await this.setupService.findOne(backup.setupId);
-    if(backup.s3Url == null) {
-      return `backup with id ${backupId} does not have s3Url`
-    }
-  
-    const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${backup.name}` : `/tmp/${backup.name}`;
-    const tempUnzipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${backup.name.replace('.zip', '.sql')}` : `/tmp/${backup.name.replace('.zip', '.sql')}`;
-  
-    console.log(`Downloading zip file from S3 to: ${tempZipPath}`);
-    console.log(`Unzipping to: ${tempUnzipPath}`);
-  
-    const presignedUrl = await this.s3Service.getPresignedUrl(backup.name);
-    await execAsync(`curl -o ${tempZipPath} "${presignedUrl}"`);
-  
-    if (!fs.existsSync(tempZipPath)) {
-      throw new Error(`Backup file not found at ${tempZipPath}`);
-    }
-  
-    await execAsync(`unzip -o ${tempZipPath} -d /tmp`);
-  
-    const unzippedContents = fs.readdirSync('/tmp');
-    console.log('Unzipped contents of /tmp:', unzippedContents);
-  
-    if (!fs.existsSync(tempUnzipPath)) {
-      throw new Error(`Unzipped file not found at ${tempUnzipPath}`);
-    }
-  
-    await execAsync(`
-      kubectl cp ${tempUnzipPath} ${setup.nameSpace}/${setup.podName}:/var/www/html/${backup.name.replace('.zip', '')} && \
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -- sh -c "wp db import /var/www/html/${backup.name.replace('.zip', '')} --allow-root"
-    `);
-  
-    await execAsync(`rm -f ${tempZipPath} ${tempUnzipPath}`);
-  
-    return { message: 'Backup restored successfully from zipped file' };
+async restoreBackupFromS3(backupId: number) {
+  // Fetch backup and validate its type
+  const backup = await this.backupRepository.findOne(backupId);
+  if (!backup || !backup.s3ZippedUrl || !backup.s3SqlUrl) {
+    throw new Error('Invalid backup or missing S3 URLs');
   }
+
+  // Fetch setup associated with the backup
+  const setup = await this.setupService.findOne(backup.setupId);
+  if (!setup) {
+    throw new Error('Setup not found for the backup');
+  }
+
+  const backupDir = '/backups';
+  const zipFilePath = `${backupDir}/site.zip`;
+  const sqlFilePath = `${backupDir}/site.sql`;
+
+  // Download the zipped site and SQL file to the pod using kubectl exec -it for interactive commands
+  await execAsync(`
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
+      apt update && apt install -y curl &&
+      mkdir -p '${backupDir}' &&
+      curl -o '${zipFilePath}' '${backup.s3ZippedUrl}' &&
+      curl -o '${sqlFilePath}' '${backup.s3SqlUrl}'"
+  `);
+
+  // Validate the downloaded ZIP file
+   await execAsync(`
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
+      if [ ! -f '${zipFilePath}' ]; then echo 'ZIP file not found'; exit 1; fi &&
+      unzip -tq '${zipFilePath}'"
+  `).catch((error) => {
+    throw new Error('Downloaded ZIP file is invalid or corrupted');
+  });
+
+  // Extract and restore WordPress files
+  await execAsync(`
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
+      apt install -y unzip &&
+      unzip -o '${zipFilePath}' -d '${backupDir}' &&
+      rm -rf /var/www/html/* &&
+      mv '${backupDir}/wp-content' /var/www/html/ &&
+      mv '${backupDir}/wp-admin' /var/www/html/ &&
+      mv '${backupDir}/wp-includes' /var/www/html/ &&
+      mv '${backupDir}/wp-config.php' /var/www/html/"
+  `);
+
+  // Adjust permissions for WordPress files
+  await execAsync(`
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
+      chown -R www-data:www-data /var/www/html"
+  `);
+
+  // Restore the database
+  await execAsync(`
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
+      wp db import '${sqlFilePath}' --allow-root"
+  `);
+
+  // Clean up backup files from the pod
+  await execAsync(`
+    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
+      rm -f '${zipFilePath}' '${sqlFilePath}'"
+  `);
+
+  // Delete the backup record from the database
+  await this.backupRepository.deleteBackup(backupId);
+
+  return { message: 'Backup restored successfully from S3' };
+}
+
+
+
+
   
 
   async createManualBackupToPod(setupId: number, backupType: string) {
@@ -294,8 +391,8 @@ async restoreManualFromPod(backupId: number) {
 
   async downloadBackup(backupId: number) {
     const backup = await this.backupRepository.findOne(backupId)
-    if(backup.whereGo == 's3' && backup.s3Url) {
-      return backup.s3Url
+    if(backup.whereGo == 's3' && backup.s3ZippedUrl) {
+      return backup.s3ZippedUrl
     }
     return 'backup does not have s3Url or is not uploaded on s3'
   }
