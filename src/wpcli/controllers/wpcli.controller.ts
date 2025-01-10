@@ -210,7 +210,6 @@ export class wpcliController {
     }
   }
 
-  
   @Roles(Role.USER)
   @ApiWpPluginDeactivate()
   @Patch('plugin/disable/:setupId')
@@ -329,6 +328,34 @@ export class wpcliController {
     } catch (error) {
       throw new HttpException(
         error.message || 'Failed to get core version',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Roles(Role.USER)
+  @ApiWpCoreVersion()
+  @Get('sitetitle/:setupId')
+  async wpBlogname(@Param('setupId') setupId: number) {
+    try {
+      return await this.wpCliService.wpBlogname(setupId);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to get blogname',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Roles(Role.USER)
+  @ApiWpCoreVersion()
+  @Get('siteicon/:setupId')
+  async wpSiteIconUrl(@Param('setupId') setupId: number) {
+    try {
+      return await this.wpCliService.wpSiteIconUrl(setupId);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Failed to get site icon URL',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

@@ -3,14 +3,15 @@ import { User } from '../entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from '../dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
-import { error } from 'console';
-import { UpdateUserDto } from '../dto/update-user.dto';
 import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import { SetupService } from 'src/setup/services/setup.service';
+
 
 export class UserRepository {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly setupService: SetupService
   ) {}
 
   async me(userId: number) {
@@ -25,24 +26,40 @@ export class UserRepository {
         'user.email',
         'setup.id',
         'setup.podName',
-        'setup.phpVersion',
         'setup.port',
-        'setup.siteTitle',
         'setup.nameSpace',
-        'setup.wpVersion',
         'setup.nodeIp',
         'setup.wpfullIp',
-        'setup.dbName',
         'setup.siteName',
-        'setup.phpAdminFullIp'
+        'setup.phpAdminFullIp',
       ])
       .getOne();
-
+  
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
+  
+    if (!user.setup || user.setup.length === 0) {
+      throw new NotFoundException(`No setups found for user with ID ${userId}`);
+    }
+  
+    // Iterate over all setups to update their information
+    for (const setup of user.setup) {
+      const { podName, nameSpace } = setup;
+  
+      const siteTitleOutput = await this.setupService.runKubectlCommand(
+        nameSpace,
+        podName,
+        'wp option get blogname --allow-root',
+      );
+      const siteTitle = siteTitleOutput.trim();
+
+      setup.siteTitle = siteTitle;
+    }
+  
     return user;
   }
+  
 
   async create(createUserDto: CreateUserDto) {
     const { firstName, lastName, email, password, confirmPassword } = createUserDto;

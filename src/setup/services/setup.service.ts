@@ -24,7 +24,6 @@ export class SetupService {
 
   async runKubectlCommand(namespace: string, podName: string, command: string, containerName: string = 'wordpress',) {
     const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -c ${containerName} -- ${command}`;
-    console.log(kubectlCommand);
     
     try {
       const { stdout, stderr } = await execAsync(kubectlCommand);
@@ -503,18 +502,6 @@ export class SetupService {
       podName,
       'wp plugin install wordpress-importer --activate --allow-root',
     );
-    await this.runKubectlCommand(
-      namespace,
-      podName,
-      'wp theme activate twentytwentyfour --allow-root',
-    );
-    const output = await this.runKubectlCommand(
-      namespace,
-      podName,
-      'wp db size --format=json --allow-root',
-    );
-    const dbName = JSON.parse(output);
-    const readydbName = dbName[0].Name;
 
     // Set file permissions
     console.log('Setting file permissions...');
@@ -529,23 +516,6 @@ export class SetupService {
         'Error setting file permissions: Read-only file system. Skipping chown.',
       );
     }
-
-    // Get PHP version
-    const phpVersionOutput = await this.runKubectlCommand(
-      namespace,
-      podName,
-      'wp --info --format=json --allow-root',
-    );
-    const phpVersionInfo = JSON.parse(phpVersionOutput);
-    const phpVersion = phpVersionInfo.php_version;
-
-    // Get WordPress version
-    const wpVersionOutput = await this.runKubectlCommand(
-      namespace,
-      podName,
-      'wp core version --allow-root',
-    );
-    const wpVersion = wpVersionOutput.trim();
 
     const sqlPodName = await this.k8sService.findPodByLabel(
       namespace,
@@ -586,8 +556,6 @@ export class SetupService {
       podName,
       nodePort,
       userId,
-      phpVersion,
-      wpVersion,
       sqlPodName,
       wpDeployment,
       sqlDeployment,
@@ -595,7 +563,6 @@ export class SetupService {
       sqlReplicaSet,
       nodeIp,
       wpfullIp,
-      readydbName,
       mysqlPassword,
       siteName,
       phpAdminFullIp,
@@ -681,15 +648,16 @@ export class SetupService {
     podName: string,
     logFile: 'access.log' | 'error.log',
     limit: number = 100,
-  ): Promise<string> {
+  ): Promise<string[]> {
     const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -c nginx -- tail -n ${limit} /var/log/nginx/${logFile}`;
-    
+  
     try {
       const { stdout, stderr } = await execAsync(kubectlCommand);
       if (stderr) {
         console.error(`Error fetching log file "${logFile}" from pod "${podName}":`, stderr);
       }
-      return stdout;
+      // Split the logs into an array of strings by line
+      return stdout.split('\n').filter((line) => line.trim() !== '');
     } catch (error) {
       console.error(`Failed to fetch log file "${logFile}" from pod "${podName}":`, error);
       throw new InternalServerErrorException(

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { SetupController } from './controllers/setup.controller';
 import { SetupService } from './services/setup.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -15,10 +15,10 @@ import { KubernetesService } from './services/kubernetes.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Setup,wpPlugin, wpTheme, WpUser]),
-    UserModule,
+    forwardRef(() => UserModule)
   ],
   controllers: [SetupController],
   providers: [SetupService, SetupRepository, WpPluginRepository, WpUserRepository,KubernetesService],
-  exports: [SetupRepository, SetupService],
+  exports: [SetupRepository, SetupService,KubernetesService],
 })
 export class SetupModule {}

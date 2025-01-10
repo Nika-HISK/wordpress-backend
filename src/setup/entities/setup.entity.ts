@@ -26,12 +26,6 @@ export class Setup extends baseEntity {
   nameSpace: string;
 
   @Column()
-  phpVersion: string;
-
-  @Column()
-  wpVersion: string;
-
-  @Column()
   port: number;
 
   @Column()
@@ -51,9 +45,6 @@ export class Setup extends baseEntity {
 
   @Column()
   sqlReplicaSet: string;
-
-  @Column()
-  dbName: string;
 
   @Column()
   userId: number;

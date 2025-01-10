@@ -566,4 +566,52 @@ async wpPluginDeactivate(setupId: number, plugins: string[]): Promise<string[]> 
     const phpVersion = { phpVersion: info.php_version };
     return phpVersion;
   }
+
+  async wpBlogname(setupId: number): Promise<object> {
+    const command = 'wp option get blogname --allow-root';
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new HttpException(
+        `Setup with ID ${setupId} not found`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+  
+    const output = await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      command,
+    );
+    const blogname = { blogname: output.trim() };
+  
+    return blogname;
+  }
+
+
+
+  async wpSiteIconUrl(setupId: number): Promise<object> {
+    const command = 'wp eval "echo wp_get_attachment_url(get_option(\'site_icon\'));" --allow-root';
+  
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new HttpException(
+        `Setup with ID ${setupId} not found`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+  
+    const output = await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      command,
+    );
+    const siteIconUrl = { siteIconUrl: output.trim() };
+  
+    return siteIconUrl;
+  }
+  
 }
+
+
+

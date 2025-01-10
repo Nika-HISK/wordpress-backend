@@ -57,8 +57,6 @@ export class SetupRepository {
     podName: string,
     Port: number,
     id: number,
-    phpVersion: string,
-    wpVersion: string,
     sqlPodName: string,
     wpDeployment: string,
     sqlDeployment: string,
@@ -66,7 +64,6 @@ export class SetupRepository {
     sqlReplicaSet: string,
     nodeIp: string,
     wpfullIp: string,
-    dbName: string,
     mysqlPassword: string,
     siteName: string,
     phpAdminFullIp: string
@@ -86,8 +83,6 @@ export class SetupRepository {
     newSetup.port = Port;
     newSetup.podName = podName;
     newSetup.userId = id;
-    newSetup.phpVersion = phpVersion;
-    newSetup.wpVersion = wpVersion;
     newSetup.sqlPodName = sqlPodName;
     newSetup.wpDeployment = wpDeployment;
     newSetup.sqlDeployment = sqlDeployment;
@@ -95,7 +90,6 @@ export class SetupRepository {
     newSetup.sqlReplicaSet = sqlReplicaSet;
     newSetup.nodeIp = nodeIp;
     newSetup.wpfullIp = wpfullIp;
-    newSetup.dbName = dbName;
     newSetup.siteName = siteName;
     newSetup.mysqlPassword = encryptedMysqlPassword;
     newSetup.phpAdminFullIp = phpAdminFullIp
