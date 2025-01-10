@@ -22,7 +22,7 @@ export class BackupRepository {
     private readonly setupService: SetupService
   ) {}
 
-  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3ZippedUrl: string, backupType: string, whereGo: string, createBackupDto: CreateBackupDto, plugins: Json, themes: Json , s3SqlUrl: string) {
+  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3ZippedUrl: string, backupType: string, whereGo: string, createBackupDto: CreateBackupDto, s3SqlUrl: string) {
   
 
   const newBackup = new Backup()
@@ -33,8 +33,6 @@ export class BackupRepository {
   newBackup.type = backupType
   newBackup.whereGo = whereGo
   newBackup.note = createBackupDto.note
-  newBackup.plugins = [plugins]
-  newBackup.themes = [themes]
   newBackup.s3SqlUrl = s3SqlUrl
 
   return await this.backupRepository.save(newBackup)
