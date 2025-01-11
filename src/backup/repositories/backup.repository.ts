@@ -56,7 +56,7 @@ export class BackupRepository {
   
     }
 
-    async createManulToPodWithLimit(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, createBackupDto: CreateBackupDto) {
+    async createManulToPodWithLimit(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, createBackupDto: CreateBackupDto, expiry) {
   
 
       const newBackup = new Backup()
@@ -66,6 +66,7 @@ export class BackupRepository {
       newBackup.type = backupType
       newBackup.whereGo = whereGo
       newBackup.note = createBackupDto.note
+      newBackup.expiry = expiry
     
       return await this.backupRepository.save(newBackup)
     
@@ -91,14 +92,18 @@ export class BackupRepository {
 
   async findBySetupId(setupId: number): Promise<Backup[]> {
     if (!setupId || isNaN(setupId)) {
-        throw new Error('Invalid setupId');
+      throw new Error('Invalid setupId');
     }
-
+  
+    const backupType = 'manualLimited';
+  
     return this.backupRepository.createQueryBuilder('backup')
-        .where('backup.setupId = :setupId', { setupId })
-        .orderBy('backup.createdAt', 'DESC')
-        .getMany();
-}
+      .where('backup.setupId = :setupId', { setupId })
+      .andWhere('backup.type = :backupType', { backupType }) // Ensure key matches the binding name
+      .orderBy('backup.createdAt', 'DESC')
+      .getMany();
+  }
+  
 
 
   findManualBackups() {

@@ -12,6 +12,7 @@ import * as os from 'os';
 import { CreateBackupDto } from '../dto/create-backup.dto';
 import { wpcliService } from 'src/wpcli/services/wpcli.service';
 import { Readable } from 'stream';
+import { async } from 'rxjs';
 
 
 const execAsync = promisify(exec);
@@ -217,20 +218,37 @@ async restoreManualFromPod(backupId: number) {
 
 
 private scheduleDailyBackups() {
-    const backupType = 'daily'
-    this.backupInterval = setInterval(async () => {
-      console.log('Starting daily backup process...');
-      const setups = await this.setupService.findAll(); 
-      for (const setup of setups) {
-        try {
-          console.log(`Creating backup for setup: ${setup.id}`);
-          await this.createManualBackupToPod(setup.id, backupType);
-        } catch (error) {
-          console.error(`Failed to create backup for setup: ${setup.id}`, error);
-        }
+  const backupType = 'daily';
+  const backupRetentionPeriod = 1209600000; 
+
+  this.backupInterval = setInterval(async () => {
+    console.log('Starting daily backup process...');
+    const setups = await this.setupService.findAll();
+
+    for (const setup of setups) {
+      try {
+        console.log(`Creating backup for setup: ${setup.id}`);
+        const backup = await this.createManualBackupToPod(setup.id, backupType);
+
+        this.scheduleBackupDeletion(backup.id, backupRetentionPeriod);
+      } catch (error) {
+        console.error(`Failed to create backup for setup: ${setup.id}`, error);
       }
-    }, 86400000); 
-  }
+    }
+  }, 86400000);  
+}
+
+private scheduleBackupDeletion(backupId: number, delay: number) {
+  setTimeout(async () => {
+    try {
+      console.log(`Deleting backup with ID: ${backupId}`);
+      await this.deleteBackupFromPod(backupId);
+    } catch (error) {
+      console.error(`Failed to delete backup with ID: ${backupId}`, error);
+    }
+  }, delay);
+}
+
 
   onModuleInit() {
     console.log('BackupService initialized, starting daily backup scheduler...');
@@ -262,7 +280,7 @@ private scheduleDailyBackups() {
       setTimeout(async () => {
         await this.deleteBackupFromPod(backup.id);
       }, 86400000);
-    }, 21600000); 
+    }, 5000);  //21600000
   }
   
   
@@ -346,6 +364,9 @@ private scheduleDailyBackups() {
         zip -r '${backupDir}/${zipFileName}' ."
     `);
 
+    const createdAt = new Date();  
+    const expiry = new Date(createdAt.getTime() + 14 * 24 * 60 * 60 * 1000); 
+    
     const backup = await this.backupRepository.createManulToPodWithLimit(
         zipFileName,
         setupId,
@@ -353,7 +374,9 @@ private scheduleDailyBackups() {
         backupType,
         whereGo,
         createBackupDto,
+        expiry
     );
+    
 
     return backup;
 }

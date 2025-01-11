@@ -39,4 +39,7 @@ export class Backup extends baseEntity {
 
   @Column({ type: 'json', nullable: true})
   themes: string[]
+
+  @Column({nullable: true})
+  expiry: Date
 }
