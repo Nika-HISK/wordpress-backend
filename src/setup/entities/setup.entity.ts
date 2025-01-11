@@ -1,3 +1,4 @@
+import { Backup } from 'src/backup/entities/backup.entity';
 import { baseEntity } from 'src/base/entities/base.entity';
 import { User } from 'src/user/entities/user.entity';
 import { wpPlugin } from 'src/wpcli/entities/wpPlugin.entity';
@@ -44,6 +45,9 @@ export class Setup extends baseEntity {
   wpReplicaSet: string;
 
   @Column()
+  instanceId: string
+
+  @Column()
   sqlReplicaSet: string;
 
   @Column()
@@ -76,4 +80,7 @@ export class Setup extends baseEntity {
   @OneToMany(() => WpUser, (wpUser) => wpUser.setup)
   @JoinColumn({ name: 'setupId' })
   wpUsers: WpUser[];
+
+  @OneToMany(() => Backup, (backups) => backups.setup)
+  backups: Backup[]
 }

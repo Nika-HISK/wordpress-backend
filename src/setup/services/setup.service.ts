@@ -566,6 +566,7 @@ export class SetupService {
       mysqlPassword,
       siteName,
       phpAdminFullIp,
+      instanceId
     );
 
     await this.updateNginxErrorLogLevel(namespace, podName, 'debug',);
