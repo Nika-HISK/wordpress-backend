@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { promisify } from 'util';
 import { Repository } from 'typeorm';
 import { Backup } from '../entities/backup.entity';
 import { FilesService } from 'src/files/services/files.service';
@@ -7,10 +6,9 @@ import { KubernetesService } from 'src/setup/services/kubernetes.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CreateBackupDto } from '../dto/create-backup.dto';
 import { SetupService } from 'src/setup/services/setup.service';
-import { exec } from 'child_process';
 import { Json } from 'aws-sdk/clients/robomaker';
-const execAsync = promisify(exec);
-
+import { String } from 'aws-sdk/clients/appstream';
+const dayjs = require('dayjs');
 
 @Injectable()
 export class BackupRepository {
@@ -41,7 +39,8 @@ export class BackupRepository {
 
 
   async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, plugins: Json, themes: Json) {
-  
+    const newDate = new Date();
+    const formattedDate = dayjs(newDate).format("MMM DD , YYYY , hh : mm A").toString();
 
     const newBackup = new Backup()
     newBackup.name = backupName
@@ -51,26 +50,37 @@ export class BackupRepository {
     newBackup.whereGo = whereGo
     newBackup.plugins = [plugins]
     newBackup.themes = [themes]
+    newBackup.formatedCreatedAt = formattedDate
   
     return await this.backupRepository.save(newBackup)
   
     }
 
-    async createManulToPodWithLimit(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, createBackupDto: CreateBackupDto, expiry) {
-  
+    async createManulToPodWithLimit(
+      backupName: string, 
+      setupId: number, 
+      instanceId: string,  
+      backupType: string, 
+      whereGo: string, 
+      createBackupDto: CreateBackupDto, 
+      expiry: String,
 
-      const newBackup = new Backup()
-      newBackup.name = backupName
-      newBackup.setupId = setupId
-      newBackup.instanceId = instanceId
-      newBackup.type = backupType
-      newBackup.whereGo = whereGo
-      newBackup.note = createBackupDto.note
-      newBackup.expiry = expiry
+    ) {
+      const newDate = new Date();
+      const formattedDate = dayjs(newDate).format("MMM DD , YYYY , hh : mm A").toString();
+      
+      const newBackup = new Backup();
+      newBackup.name = backupName;
+      newBackup.setupId = setupId;
+      newBackup.instanceId = instanceId;
+      newBackup.type = backupType;
+      newBackup.whereGo = whereGo;
+      newBackup.note = createBackupDto.note;
+      newBackup.expiry = expiry;
+      newBackup.formatedCreatedAt = formattedDate;
     
-      return await this.backupRepository.save(newBackup)
-    
-      }
+      return await this.backupRepository.save(newBackup);
+    }
 
   async createDailyBackup(setupId:number) {
     
@@ -124,8 +134,13 @@ export class BackupRepository {
   }
 
 
-  findManualLimited() {
-    return this.backupRepository.find({where: {type: 'manualLimited'}})
-
+  findManualLimitedBysetypId(setupId: number) {
+    return this.backupRepository.find({
+      where: {
+        setupId: setupId,
+        type: 'manualLimited',
+      },
+    });
   }
+  
 }

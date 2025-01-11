@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Delete, Get } from '@nestjs/common';
+import { Controller, Post, Body, Param, Delete, Get, Put } from '@nestjs/common';
 import { BackupService } from '../services/backup.service';
 import { CreateBackupDto } from '../dto/create-backup.dto';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
@@ -28,7 +28,7 @@ export class BackupController {
   }
 
   @Roles(Role.USER)
-  @Post('restoreFromPod/:backupId')
+  @Put('restoreFromPod/:backupId')
   async restoreManualFromPod(@Param('backupId') backupId:string) {
     return await this.backupService.restoreManualFromPod(Number(backupId))
   }
@@ -97,9 +97,13 @@ export class BackupController {
 
 
   @Roles(Role.USER)
-  @Get('manualLimited')
-  async findManualLimited() {
-    return await this.backupService.findManualLimited()
+  @Get('manualLimited/:setupId')
+  async findManualLimited(@Param('setupId') setupId:string) {
+    return await this.backupService.findManualLimited(Number(setupId))
   }
 
-}
+  @Roles(Role.USER)
+  @Get('percent/:setupId')
+  async findPercent(@Param('setupId') setupId:string) {
+    return await this.backupService.findPercent(Number(setupId))
+  }}

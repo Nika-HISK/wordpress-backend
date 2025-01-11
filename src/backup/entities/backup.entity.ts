@@ -41,5 +41,10 @@ export class Backup extends baseEntity {
   themes: string[]
 
   @Column({nullable: true})
-  expiry: Date
+  expiry: string
+
+  @Column({nullable: true})
+  formatedCreatedAt: string
+
+
 }

@@ -13,6 +13,8 @@ import { CreateBackupDto } from '../dto/create-backup.dto';
 import { wpcliService } from 'src/wpcli/services/wpcli.service';
 import { Readable } from 'stream';
 import { async } from 'rxjs';
+const dayjs = require('dayjs');
+
 
 
 const execAsync = promisify(exec);
@@ -78,9 +80,6 @@ export class BackupService {
     const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${backup.name}` : `/tmp/${backup.name}`;
     const tempUnzipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${backup.name.replace('.zip', '.sql')}` : `/tmp/${backup.name.replace('.zip', '.sql')}`;
 
-    console.log(`Downloading zip file from S3 to: ${tempZipPath}`);
-    console.log(`Unzipping to: ${tempUnzipPath}`);
-
     const presignedUrl = await this.s3Service.getPresignedUrl(backup.name);
     await execAsync(`curl -o ${tempZipPath} "${presignedUrl}"`);
 
@@ -91,7 +90,6 @@ export class BackupService {
     await execAsync(`unzip -o ${tempZipPath} -d /tmp`);
 
     const unzippedContents = fs.readdirSync('/tmp');
-    console.log('Unzipped contents of /tmp:', unzippedContents);
 
     if (!fs.existsSync(tempUnzipPath)) {
       throw new Error(`Unzipped file not found at ${tempUnzipPath}`);
@@ -120,24 +118,57 @@ export class BackupService {
     const plugins = await this.wpCliService.wpPluginList(setupId);
     const themes = await this.wpCliService.wpThemeList(setupId);
 
-    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-');
-    const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
-    const sqlFileName = `${sanitizedSiteName}-${instanceId}.sql`;
+    const zipFileName = `${setup.siteName}-${instanceId}.zip`;
+    const sqlFileName = `${setup.siteName}-${instanceId}.sql`;
     const backupDir = '/backups';
     const wordpressDir = '/var/www/html'; 
 
-    await execAsync(`
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
-        apt update && apt install -y mariadb-client zip &&
-        mkdir -p '${backupDir}' &&
+    // await execAsync(`
+    //   kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
+    //     apt update && apt install -y mariadb-client zip &&
+    //     mkdir -p '${backupDir}' &&
         
-        # Export the database directly to the backup directory
-        wp db export '${backupDir}/${sqlFileName}' --allow-root &&
+    //     # Export the database directly to the backup directory
+    //     wp db export '${backupDir}/${sqlFileName}' --allow-root &&
         
-        # Zip the entire WordPress directory and move it to the backup directory
-        cd ${wordpressDir} &&
-        zip -r '${backupDir}/${zipFileName}' ."
-    `);
+    //     # Zip the entire WordPress directory and move it to the backup directory
+    //     cd ${wordpressDir} &&
+    //     zip -r '${backupDir}/${zipFileName}' ."
+    // `);
+
+    try {
+      const updateOutput = await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        'apt update'
+      );
+    
+      const installOutput = await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        'apt install -y mariadb-client zip'
+      );
+    
+      const mkdirOutput = await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        'mkdir -p /backups'
+      );
+    
+      const exportOutput = await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        `wp db export /backups/${sqlFileName} --allow-root`
+      );
+    
+      const zipOutput = await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        `zip -r /backups/${zipFileName} .`
+      );
+    } catch (error) {
+      console.error('Command error:', error);
+    }
 
     const backup = await this.backupRepository.createManulToPod(
         zipFileName,
@@ -172,44 +203,22 @@ async restoreManualFromPod(backupId: number) {
   const sqlFileName = backupFileName.replace('.zip', '.sql');
   const sqlFilePath = `${backupDir}/${sqlFileName}`;
 
-  await execAsync(`
-    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
-      if [ ! -f '${zipFilePath}' ]; then
-        echo 'Backup file not found in pod'; exit 1;
-      fi
-    "
-  `);
 
-  await execAsync(`
-    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
-      apt update && apt install -y unzip &&
-      unzip -o '${zipFilePath}' -d '${backupDir}'"
-  `);
 
-  await execAsync(`
-    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
-      rm -rf /var/www/html/wp-content /var/www/html/wp-admin /var/www/html/wp-includes /var/www/html/wp-config.php /var/www/html/wp-config-sample.php &&
-      mv '${backupDir}/wp-content' /var/www/html/ &&
-      mv '${backupDir}/wp-admin' /var/www/html/ &&
-      mv '${backupDir}/wp-includes' /var/www/html/ &&
-      mv '${backupDir}/wp-config.php' /var/www/html/ &&
-      mv '${backupDir}/wp-config-sample.php' /var/www/html/"
-  `);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get update -qq');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get install -y unzip -qq');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive unzip -o '${zipFilePath}' -d '${backupDir}'`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, 'sh -c "DEBIAN_FRONTEND=noninteractive rm -rf /var/www/html/wp-content /var/www/html/wp-admin /var/www/html/wp-includes /var/www/html/wp-config.php /var/www/html/wp-config-sample.php ');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-content' /var/www/html/`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-admin' /var/www/html/`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-includes' /var/www/html/`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-config.php' /var/www/html/`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-config-sample.php' /var/www/html/`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive chown -R www-data:www-data /var/www/html/wp-content /var/www/html/wp-content/plugins /var/www/html/wp-content/themes /var/www/html/wp-includes /var/www/html/wp-admin /var/www/html/wp-config.php /var/www/html/wp-config-sample.php`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive wp db import '${sqlFilePath}' --allow-root`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive rm -f '${zipFilePath}' '${sqlFilePath}'`);
 
-  await execAsync(`
-    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
-      chown -R www-data:www-data /var/www/html/wp-content /var/www/html/wp-content/plugins /var/www/html/wp-content/themes /var/www/html/wp-includes /var/www/html/wp-admin /var/www/html/wp-config.php /var/www/html/wp-config-sample.php"
-  `);
 
-  await execAsync(`
-    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
-      wp db import '${sqlFilePath}' --allow-root"
-  `);
-
-  await execAsync(`
-    kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
-      rm -f '${zipFilePath}' '${sqlFilePath}'"
-  `);
 
   await this.backupRepository.deleteBackup(backupId);
 
@@ -222,17 +231,14 @@ private scheduleDailyBackups() {
   const backupRetentionPeriod = 1209600000; 
 
   this.backupInterval = setInterval(async () => {
-    console.log('Starting daily backup process...');
     const setups = await this.setupService.findAll();
 
     for (const setup of setups) {
       try {
-        console.log(`Creating backup for setup: ${setup.id}`);
         const backup = await this.createManualBackupToPod(setup.id, backupType);
 
         this.scheduleBackupDeletion(backup.id, backupRetentionPeriod);
       } catch (error) {
-        console.error(`Failed to create backup for setup: ${setup.id}`, error);
       }
     }
   }, 86400000);  
@@ -241,7 +247,6 @@ private scheduleDailyBackups() {
 private scheduleBackupDeletion(backupId: number, delay: number) {
   setTimeout(async () => {
     try {
-      console.log(`Deleting backup with ID: ${backupId}`);
       await this.deleteBackupFromPod(backupId);
     } catch (error) {
       console.error(`Failed to delete backup with ID: ${backupId}`, error);
@@ -251,14 +256,12 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
 
 
   onModuleInit() {
-    console.log('BackupService initialized, starting daily backup scheduler...');
     this.scheduleDailyBackups();
   }
 
   onModuleDestroy() {
     if (this.backupInterval) {
       clearInterval(this.backupInterval);
-      console.log('Daily backup scheduler stopped.');
     }
   }
   
@@ -280,7 +283,7 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
       setTimeout(async () => {
         await this.deleteBackupFromPod(backup.id);
       }, 86400000);
-    }, 5000);  //21600000
+    }, 21600000);  
   }
   
   
@@ -291,7 +294,6 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
     const zippedName =  backup.name
     const sqlName = zippedName.replace('.zip', '.sql')
 
-    console.log(zippedName, sqlName);
     
 
     await execAsync(`
@@ -321,12 +323,12 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
 
   async createManualWithLimit(setupId: number, backupType: string, createBackupDto: CreateBackupDto) {
     const existingBackups = await this.backupRepository.findBySetupId(setupId);
-    
+    const limitedLength = existingBackups.length
     if (existingBackups.length >= 5) {
         throw new HttpException('You cannot create more than 5 backups', HttpStatus.BAD_REQUEST);
     }
 
-    const backup = await this.createManualBackupToPodForLimit(setupId, backupType, createBackupDto);
+    const backup = await this.createManualBackupToPodForLimit(setupId, backupType, createBackupDto, limitedLength);
 
     setTimeout(async () => {
         try {
@@ -340,33 +342,49 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
 }
 
 
-  async createManualBackupToPodForLimit(setupId: number, backupType: string, createBackupDto: CreateBackupDto) {
+  async createManualBackupToPodForLimit(setupId: number, backupType: string, createBackupDto: CreateBackupDto, limitedLength: number) {
     const whereGo = 'pod';
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
 
-    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-');
-    const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
-    const sqlFileName = `${sanitizedSiteName}-${instanceId}.sql`;
+    const zipFileName = `${setup.siteName}-${instanceId}.zip`;
+    const sqlFileName = `${setup.siteName}-${instanceId}.sql`;
     const backupDir = '/backups';
     const wordpressDir = '/var/www/html'; 
 
-    await execAsync(`
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "
-        apt update && apt install -y mariadb-client zip &&
-        mkdir -p '${backupDir}' &&
-        
-        # Export the database directly to the backup directory
-        wp db export '${backupDir}/${sqlFileName}' --allow-root &&
-        
-        # Zip the entire WordPress directory and move it to the backup directory
-        cd ${wordpressDir} &&
-        zip -r '${backupDir}/${zipFileName}' ."
-    `);
+    try {
+      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get update -qq');
+
+    
+      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get install -y mariadb-client zip -qq');
+
+      const mkdirOutput = await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        'mkdir -p /backups'
+      );
+    
+      const exportOutput = await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        `wp db export /backups/${sqlFileName} --allow-root`
+      );
+    
+      const zipOutput = await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        `zip -r /backups/${zipFileName} .`
+      );
+    } catch (error) {
+      console.error('Command error:', error);
+    }
+
 
     const createdAt = new Date();  
-    const expiry = new Date(createdAt.getTime() + 14 * 24 * 60 * 60 * 1000); 
-    
+    const expiry = new Date(createdAt.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const formattedExpiry = dayjs(expiry).format("MMM DD , YYYY , hh : mm A");
+
+        
     const backup = await this.backupRepository.createManulToPodWithLimit(
         zipFileName,
         setupId,
@@ -374,7 +392,8 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
         backupType,
         whereGo,
         createBackupDto,
-        expiry
+        formattedExpiry,
+
     );
     
 
@@ -400,8 +419,24 @@ findSixHourlyBackups() {
 }
 
 
-findManualLimited() {
-  return this.backupRepository.findManualLimited()
+findManualLimited(setupId:number) {
+  return this.backupRepository.findManualLimitedBysetypId(setupId)
+}
+
+async findPercent(setupId: number) {
+  const maximum = 5
+
+  const existingBackups = await this.backupRepository.findBySetupId(setupId)
+
+  const percent = existingBackups.length / maximum * 100
+  const obj = {
+    maximum: maximum,
+    existingBackupsleangth: existingBackups.length,
+    percent: percent
+  }
+
+  return obj;
+
 }
 
 }
