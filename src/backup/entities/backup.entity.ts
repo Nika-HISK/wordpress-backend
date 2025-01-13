@@ -25,7 +25,7 @@ export class Backup extends baseEntity {
   s3SqlUrl:string
 
 
-  @Column({type: 'enum', enum:[ 'daily', 'hourly', 'six-hourly', 'manual', 'manualLimited']})
+  @Column({type: 'enum', enum:[ 'daily', 'hourly', 'six-hourly', 'manual', 'manualLimited', 'downloadable']})
   type: string
 
   @Column({type: 'enum', enum:['s3', 'pod']})

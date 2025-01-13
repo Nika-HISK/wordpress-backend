@@ -70,6 +70,12 @@ export class BackupController {
     return await this.backupService.createManualWithLimit(Number(setupId), backupType, createBackupDto)
   }
 
+  @Roles(Role.USER)    
+  @Post('downloadablebackup/:setupId')
+  async createDownloadableBackup(@Param('setupId') setupId:string,  @Body() createBackupDto: CreateBackupDto) {
+    return await this.backupService.createDownloadableBackup(Number(setupId))
+  }
+
   @Roles(Role.USER)
   @Get('manual')
   async findManualBackups() {

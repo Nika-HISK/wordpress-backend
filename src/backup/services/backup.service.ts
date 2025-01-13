@@ -10,6 +10,7 @@ import { s3Service } from 'src/aws/services/s3.service';
 import * as fs from 'fs';
 import * as os from 'os';
 import { CreateBackupDto } from '../dto/create-backup.dto';
+import * as path from 'path';
 import { wpcliService } from 'src/wpcli/services/wpcli.service';
 const dayjs = require('dayjs');
 
@@ -414,5 +415,31 @@ async findPercent(setupId: number) {
   return obj;
 
 }
+
+
+
+
+async createDownloadableBackup(setupId: number) {
+  const backup = await this.createManualBackupToPod(setupId, 'downloadable');
+  const setup = await this.setupService.findOne(backup.setupId);
+  const backupFilePath = `/backups/${backup.name}`;
+
+  const fileContent = await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `cat ${backupFilePath}`);
+  
+  const buffer = Buffer.from(fileContent);
+
+  const uploadResult = await this.filesService.uploadFile({
+    originalname: backup.name,
+    mimetype: 'application/zip',
+    buffer: buffer,
+  } as Express.Multer.File);
+
+  const fileKey = uploadResult.key;
+  const presignedUrl = await this.s3Service.getPresignedUrl(fileKey);
+
+  backup.s3ZippedUrl = presignedUrl;
+  return backup;
+}
+
 
 }
