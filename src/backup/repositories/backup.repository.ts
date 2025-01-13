@@ -38,7 +38,7 @@ export class BackupRepository {
   }
 
 
-  async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, plugins: Json, themes: Json) {
+  async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string) {
     const newDate = new Date();
     const formattedDate = dayjs(newDate).format("MMM DD , YYYY , hh : mm A").toString();
 
@@ -48,8 +48,6 @@ export class BackupRepository {
     newBackup.instanceId = instanceId
     newBackup.type = backupType
     newBackup.whereGo = whereGo
-    newBackup.plugins = [plugins]
-    newBackup.themes = [themes]
     newBackup.formatedCreatedAt = formattedDate
   
     return await this.backupRepository.save(newBackup)
