@@ -7,6 +7,7 @@ import {
 } from '@kubernetes/client-node';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
+import { SetupRepository } from '../repositories/setup.repository';
 const execAsync = promisify(exec);
 
 
@@ -19,6 +20,7 @@ export class KubernetesService {
   private networkingApi: NetworkingV1Api;
   private visitCounts: Record<string, number> = {};
   private appsV1Api: AppsV1Api;
+  private setupRepository:SetupRepository
 
   constructor() {
     this.kubeConfig = new KubeConfig();
@@ -369,5 +371,98 @@ export class KubernetesService {
       throw new Error(`Failed to run WP-CLI command: ${error.message}`);
     }
   }
+
+  async updateRedirectConfig(
+    instanceId: string,
+    namespace: string,
+    oldUrl: string,
+    newUrl: string,
+    statusCode: 301 | 302,
+    action: 'add' | 'remove'
+  ) {
+    try {
+      // Fetch the existing ConfigMap
+      const { body } = await this.coreApi.readNamespacedConfigMap(
+        `nginx-config-${instanceId}`,
+        namespace
+      );
+  
+      // If ConfigMap doesn't exist, throw an error
+      if (!body || !body.data || !body.data['default.conf']) {
+        throw new Error('Nginx ConfigMap not found or missing default.conf');
+      }
+  
+
+      let nginxConfig = body.data['default.conf'];
+  
+
+      const redirectRule = `
+        location = ${oldUrl} {
+            return ${statusCode} ${newUrl};
+        }
+      `;
+  
+      console.log('Current Nginx Config:');
+      console.log(nginxConfig); 
+  
+
+      if (action === 'remove') {
+        console.log('Removing redirect rule:', redirectRule);
+        nginxConfig = nginxConfig.replace(redirectRule, '');
+      }
+  
+
+      if (action === 'add') {
+        console.log('Adding redirect rule:', redirectRule);
+  
+
+        const serverBlockStart = nginxConfig.indexOf('server {');
+        const serverBlockEnd = nginxConfig.indexOf('}', serverBlockStart);
+  
+
+        if (serverBlockStart !== -1 && serverBlockEnd !== -1) {
+          nginxConfig =
+            nginxConfig.slice(0, serverBlockEnd) +
+            '\n' +
+            redirectRule +
+            nginxConfig.slice(serverBlockEnd);
+        }
+      }
+  
+
+      console.log('Updated Nginx Config:');
+      console.log(nginxConfig);
+  
+
+      const updatedConfigMapManifest = {
+        apiVersion: 'v1',
+        kind: 'ConfigMap',
+        metadata: {
+          name: `nginx-config-${instanceId}`,
+          namespace,
+        },
+        data: {
+          'default.conf': nginxConfig,
+        },
+      };
+  
+      console.log('Deleting existing ConfigMap...');
+      await this.coreApi.deleteNamespacedConfigMap(
+        `nginx-config-${instanceId}`,
+        namespace
+      );
+  
+      console.log('Applying updated ConfigMap...');
+      await this.applyManifest(namespace, updatedConfigMapManifest);
+  
+      console.log(`Redirect rule ${action}ed successfully: ${oldUrl} -> ${newUrl}`);
+    } catch (error) {
+      console.error(`Error updating redirect: ${error.message}`);
+      throw error;
+    }
+  }
+  
+  
+
   
 }

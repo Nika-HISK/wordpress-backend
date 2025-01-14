@@ -15,7 +15,7 @@ export class Backup extends baseEntity {
   @Column()
   instanceId: string;
 
-  @ManyToOne(() => Setup, (setup) => setup.backups)
+  @ManyToOne(() => Setup, (setup) => setup.backups,  { cascade: true })
   setup:Setup
 
   @Column({length:'1000', default:'', nullable:true})

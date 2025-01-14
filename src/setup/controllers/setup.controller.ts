@@ -10,6 +10,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
   Query,
+  Put,
 } from '@nestjs/common';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupService } from '../services/setup.service';
@@ -17,6 +18,7 @@ import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
 import { Throttle } from '@nestjs/throttler';
 import { KubernetesService } from '../services/kubernetes.service';
+import { UpdateRedirectDto } from '../dto/update-redirect.dto';
 
 // @UseGuards(AuthGuard)
 @Controller('wordpress')
@@ -107,7 +109,33 @@ export class SetupController {
     }
   }
 
+
   @Roles(Role.USER)
+  @Post('redirect/:instanceId')
+  async updateRedirect(
+    @Param('instanceId') instanceId: string,
+    @Body() updateRedirectDto: UpdateRedirectDto
+  ) {
+    const { statusCode, oldUrl, newUrl, action, namespace } = updateRedirectDto;
+
+    try {
+      // Call the service to update the Nginx redirect rules
+      await this.k8sService.updateRedirectConfig(
+        instanceId,
+        namespace,
+        oldUrl,
+        newUrl,
+        statusCode,
+        action
+      );
+      return { message: 'Redirect rule updated successfully' };
+    } catch (error) {
+      return { message: `Error: ${error.message}` };
+    }
+  }
+
+
+  @Roles(Role.USER) 
   @Get('/wordpress:id')
   async findOne(@Param('id') id: string) {
     const setupId = Number(id);
