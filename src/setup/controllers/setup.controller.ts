@@ -111,18 +111,18 @@ export class SetupController {
 
 
   @Roles(Role.USER)
-  @Post('redirect/:instanceId')
+  @Post('redirect/:setupId')
   async updateRedirect(
-    @Param('instanceId') instanceId: string,
+    @Param('setupId') setupId: string,
     @Body() updateRedirectDto: UpdateRedirectDto
   ) {
-    const { statusCode, oldUrl, newUrl, action, namespace } = updateRedirectDto;
+    const { statusCode, oldUrl, newUrl, action,} = updateRedirectDto;
+    const numericSetupId = parseInt(setupId, 10);
 
     try {
       // Call the service to update the Nginx redirect rules
       await this.k8sService.updateRedirectConfig(
-        instanceId,
-        namespace,
+        numericSetupId,
         oldUrl,
         newUrl,
         statusCode,

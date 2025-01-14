@@ -8,6 +8,12 @@ import {
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { SetupRepository } from '../repositories/setup.repository';
+import { RedirectRepository } from '../repositories/redirect.repository';
+import { SetupService } from './setup.service';
+import { Repository } from 'typeorm';
+import { Setup } from '../entities/setup.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Redirect } from '../entities/redirect.entity';
 const execAsync = promisify(exec);
 
 
@@ -20,8 +26,12 @@ export class KubernetesService {
   private networkingApi: NetworkingV1Api;
   private visitCounts: Record<string, number> = {};
   private appsV1Api: AppsV1Api;
-  private setupRepository:SetupRepository
 
+
+  @InjectRepository(Setup)
+  private setupRepository:Repository<Setup>
+  @InjectRepository(Redirect)
+  private redirectRepository:Repository<Redirect>
   constructor() {
     this.kubeConfig = new KubeConfig();
     this.kubeConfig.loadFromDefault();
@@ -29,6 +39,7 @@ export class KubernetesService {
     this.appsApi = this.kubeConfig.makeApiClient(AppsV1Api);
     this.networkingApi = this.kubeConfig.makeApiClient(NetworkingV1Api);
     this.appsV1Api = this.kubeConfig.makeApiClient(AppsV1Api);
+    
   }
 
   async createNamespace(namespaceName: string): Promise<void> {
@@ -373,14 +384,22 @@ export class KubernetesService {
   }
 
   async updateRedirectConfig(
-    instanceId: string,
-    namespace: string,
+    setupId: number,
     oldUrl: string,
     newUrl: string,
     statusCode: 301 | 302,
     action: 'add' | 'remove'
   ) {
     try {
+      console.log(setupId);
+      console.log('Setup Repository:', this.setupRepository)
+      
+      const setup = await this.setupRepository.findOne({ where: { id: setupId } });
+      console.log(setup);
+      
+      const instanceId = setup.instanceId
+      const namespace = setup.nameSpace
+
       // Fetch the existing ConfigMap
       const { body } = await this.coreApi.readNamespacedConfigMap(
         `nginx-config-${instanceId}`,
@@ -399,11 +418,12 @@ export class KubernetesService {
       const redirectRule = `
         location = ${oldUrl} {
             return ${statusCode} ${newUrl};
+            add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate";
         }
       `;
   
-      console.log('Current Nginx Config:');
-      console.log(nginxConfig); 
+      // console.log('Current Nginx Config:');
+      // console.log(nginxConfig); 
   
 
       if (action === 'remove') {
@@ -430,8 +450,15 @@ export class KubernetesService {
       }
   
 
-      console.log('Updated Nginx Config:');
-      console.log(nginxConfig);
+      await this.redirectRepository.save({
+        setupId: setupId,
+        oldUrl,
+        newUrl,
+        statusCode,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    
   
 
       const updatedConfigMapManifest = {

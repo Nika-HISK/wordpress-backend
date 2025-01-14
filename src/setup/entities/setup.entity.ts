@@ -5,6 +5,7 @@ import { wpPlugin } from 'src/wpcli/entities/wpPlugin.entity';
 import { wpTheme } from 'src/wpcli/entities/wpTheme.entity';
 import { WpUser } from 'src/wpcli/entities/wpUser.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Redirect } from './redirect.entity';
 
 @Entity()
 export class Setup extends baseEntity {
@@ -83,4 +84,7 @@ export class Setup extends baseEntity {
 
   @OneToMany(() => Backup, (backups) => backups.setup)
   backups: Backup[]
+
+  @OneToMany(() => Redirect, (redirect) => redirect.setup)
+  redirects: Redirect[];
 }

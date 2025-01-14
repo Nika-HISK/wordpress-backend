@@ -13,6 +13,4 @@ export class UpdateRedirectDto {
   @IsEnum(['add', 'remove'])
   action: 'add' | 'remove';
 
-  @IsString()
-  namespace: string;
 }

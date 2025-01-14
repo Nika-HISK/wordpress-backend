@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { BackupService } from './services/backup.service';
 import { BackupController } from './controllers/backup.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -19,9 +19,10 @@ import { WpUserRepository } from 'src/wpcli/repositories/wpUser.repository';
 import { wpPlugin } from 'src/wpcli/entities/wpPlugin.entity';
 import { wpTheme } from 'src/wpcli/entities/wpTheme.entity';
 import { WpUser } from 'src/wpcli/entities/wpUser.entity';
+import { SetupModule } from 'src/setup/setup.module';
 
 @Module({
-  imports:[TypeOrmModule.forFeature([Backup, FileEntity, Setup, wpPlugin, wpTheme, WpUser])],
+  imports:[TypeOrmModule.forFeature([Backup, FileEntity, Setup, wpPlugin, wpTheme, WpUser]),forwardRef(() => SetupModule)],
   controllers: [BackupController],
   providers: [BackupService, BackupRepository, FilesService, KubernetesService, SetupService, SetupRepository, FilesRepository, s3Service, wpcliService, WpPluginRepository, WpThemeRepository, WpUserRepository],
 })
