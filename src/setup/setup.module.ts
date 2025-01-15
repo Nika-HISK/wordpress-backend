@@ -17,7 +17,7 @@ import { BackupModule } from 'src/backup/backup.module';
 
 @Module({
   imports: [forwardRef(() => BackupModule),
-    TypeOrmModule.forFeature([Setup,wpPlugin, wpTheme, WpUser,Redirect],),
+    TypeOrmModule.forFeature([Setup,wpPlugin, wpTheme, WpUser,Redirect]),
     forwardRef(() => UserModule),
     forwardRef(() => BackupModule)
   ],

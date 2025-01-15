@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import {
   KubeConfig,
   CoreV1Api,
@@ -56,6 +56,23 @@ export class KubernetesService {
         );
         throw error;
       }
+    }
+  }
+
+  async runKubectlCommand(namespace: string, podName: string, command: string, containerName: string = 'wordpress',) {
+    const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -c ${containerName} -- ${command}`;
+    
+    try {
+      const { stdout, stderr } = await execAsync(kubectlCommand);
+      if (stderr) {
+        console.error(`Error executing command "${command}":`, stderr);
+      }
+      return stdout;
+    } catch (error) {
+      console.error(`Command "${command}" failed:`, error);
+      throw new InternalServerErrorException(
+        `Failed to execute command "${command}"`,
+      );
     }
   }
 
@@ -481,6 +498,10 @@ export class KubernetesService {
   
       console.log('Applying updated ConfigMap...');
       await this.applyManifest(namespace, updatedConfigMapManifest);
+      console.log(setup.nameSpace, setup.podName, 'barroooooo');
+      
+        // await this.runKubectlCommand(setup.nameSpace, setup.podName, 'nginx -s reload', 'nginx')
+        // await this.runKubectlCommand(setup.nameSpace, setup.podName, 'nginx -s reload', 'nginx')
   
       console.log(`Redirect rule ${action}ed successfully: ${oldUrl} -> ${newUrl}`);
     } catch (error) {

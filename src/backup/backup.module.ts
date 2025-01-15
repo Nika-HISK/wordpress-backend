@@ -20,10 +20,12 @@ import { wpPlugin } from 'src/wpcli/entities/wpPlugin.entity';
 import { wpTheme } from 'src/wpcli/entities/wpTheme.entity';
 import { WpUser } from 'src/wpcli/entities/wpUser.entity';
 import { SetupModule } from 'src/setup/setup.module';
+import { RedirectRepository } from 'src/setup/repositories/redirect.repository';
+import { Redirect } from 'src/setup/entities/redirect.entity';
 
 @Module({
-  imports:[TypeOrmModule.forFeature([Backup, FileEntity, Setup, wpPlugin, wpTheme, WpUser]),forwardRef(() => SetupModule)],
+  imports:[TypeOrmModule.forFeature([Backup, FileEntity, Setup, wpPlugin, wpTheme, WpUser, Redirect]),forwardRef(() => SetupModule)],
   controllers: [BackupController],
-  providers: [BackupService, BackupRepository, FilesService, KubernetesService, SetupService, SetupRepository, FilesRepository, s3Service, wpcliService, WpPluginRepository, WpThemeRepository, WpUserRepository],
+  providers: [BackupService, BackupRepository, FilesService, KubernetesService, SetupService, SetupRepository, FilesRepository, s3Service, wpcliService, WpPluginRepository, WpThemeRepository, WpUserRepository, RedirectRepository],
 })
 export class BackupModule {}
