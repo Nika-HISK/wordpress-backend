@@ -109,7 +109,7 @@ export class BackupService {
 
   
 
-  async createManualBackupToPod(setupId: number, backupType: string) {
+  async createManualBackupToPod(setupId: number, backupType: string, s3ZippedUrl: string) {
     const whereGo = 'pod';
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
@@ -124,7 +124,8 @@ export class BackupService {
         await this.setupService.runKubectlCommand(
         setup.nameSpace,
         setup.podName,
-        '/usr/bin/apt-get update -qq'
+        '/usr/bin/apt-get update -qq', 
+        'wordpress'
       );
     
         await this.setupService.runKubectlCommand(
@@ -136,19 +137,22 @@ export class BackupService {
        await this.setupService.runKubectlCommand(
         setup.nameSpace,
         setup.podName,
-        'mkdir -p /backups'
+        'mkdir -p /backups',
+        'wordpress'
       );
     
        await this.setupService.runKubectlCommand(
         setup.nameSpace,
         setup.podName,
-        `wp db export /backups/${sqlFileName} --allow-root`
+        `wp db export /backups/${sqlFileName} --allow-root`,
+        'wordpress'
       );
     
        await this.setupService.runKubectlCommand(
         setup.nameSpace,
         setup.podName,
-        `zip -r /backups/${zipFileName} .`
+        `zip -r /backups/${zipFileName} .`,
+        'wordpress'
       );
     } catch (error) {
       console.error('Command error:', error);
@@ -160,6 +164,7 @@ export class BackupService {
         instanceId,
         backupType,
         whereGo,
+        s3ZippedUrl
     );
 
     return backup;
@@ -187,18 +192,18 @@ async restoreManualFromPod(backupId: number) {
 
 
 
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get update -qq');
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get install -y mariadb-client zip -qq');
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive unzip -o '${zipFilePath}' -d '${backupDir}'"`);
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive rm -rf /var/www/html/wp-content /var/www/html/wp-admin /var/www/html/wp-includes /var/www/html/wp-config.php /var/www/html/wp-config-sample.php"`);
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-content' /var/www/html/"`);
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-admin' /var/www/html/"`);
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-includes' /var/www/html/"`);
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-config.php' /var/www/html/"`);
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-config-sample.php' /var/www/html/"`);
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive chown -R www-data:www-data /var/www/html/wp-content /var/www/html/wp-content/plugins /var/www/html/wp-content/themes /var/www/html/wp-includes /var/www/html/wp-admin /var/www/html/wp-config.php /var/www/html/wp-config-sample.php"`);
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive wp db import '${sqlFilePath}' --allow-root"`);
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive rm -f '${zipFilePath}' '${sqlFilePath}'"`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get update -qq', 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get install -y mariadb-client zip -qq', 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive unzip -o '${zipFilePath}' -d '${backupDir}'"`, 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive rm -rf /var/www/html/wp-content /var/www/html/wp-admin /var/www/html/wp-includes /var/www/html/wp-config.php /var/www/html/wp-config-sample.php"`, 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-content' /var/www/html/"`, 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-admin' /var/www/html/"`, 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-includes' /var/www/html/"`, 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-config.php' /var/www/html/"`, 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive mv '${backupDir}/wp-config-sample.php' /var/www/html/"`, 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive chown -R www-data:www-data /var/www/html/wp-content /var/www/html/wp-content/plugins /var/www/html/wp-content/themes /var/www/html/wp-includes /var/www/html/wp-admin /var/www/html/wp-config.php /var/www/html/wp-config-sample.php"`, 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive wp db import '${sqlFilePath}' --allow-root"`, 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `sh -c "DEBIAN_FRONTEND=noninteractive rm -f '${zipFilePath}' '${sqlFilePath}'"`, 'wordpress');
 
 
   await this.backupRepository.deleteBackup(backupId);
@@ -216,7 +221,7 @@ private scheduleDailyBackups() {
 
     for (const setup of setups) {
       try {
-        const backup = await this.createManualBackupToPod(setup.id, backupType);
+        const backup = await this.createManualBackupToPod(setup.id, backupType, '');
 
         this.scheduleBackupDeletion(backup.id, backupRetentionPeriod);
       } catch (error) {
@@ -248,7 +253,7 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
   
   async createHourBackup(setupId: number) {
     setInterval(async () => {
-      const backup = await this.createManualBackupToPod(setupId, 'hourly');
+      const backup = await this.createManualBackupToPod(setupId, 'hourly', '');
   
       setTimeout(async () => {
         await this.deleteBackupFromPod(backup.id);
@@ -259,7 +264,7 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
 
   async createSixHourBackup(setupId: number) {
     setInterval(async () => {
-      const backup = await this.createManualBackupToPod(setupId, 'six-hourly');
+      const backup = await this.createManualBackupToPod(setupId, 'six-hourly', '');
       
       setTimeout(async () => {
         await this.deleteBackupFromPod(backup.id);
@@ -331,27 +336,30 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
     const zipFileName = `${setup.siteName}-${instanceId}.zip`;
     const sqlFileName = `${setup.siteName}-${instanceId}.sql`;
     try {
-      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get update -qq');
+      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get update -qq', 'wordpress');
 
     
-      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get install -y mariadb-client zip -qq');
+      await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get install -y mariadb-client zip -qq', 'wordpress');
 
        this.setupService.runKubectlCommand(
         setup.nameSpace,
         setup.podName,
-        'mkdir -p /backups'
+        'mkdir -p /backups', 
+        'wordpress'
       );
     
        this.setupService.runKubectlCommand(
         setup.nameSpace,
         setup.podName,
-        `wp db export /backups/${sqlFileName} --allow-root`
+        `wp db export /backups/${sqlFileName} --allow-root`, 
+        'wordpress'
       );
     
         await this.setupService.runKubectlCommand(
         setup.nameSpace,
         setup.podName,
-        `zip -r /backups/${zipFileName} .`
+        `zip -r /backups/${zipFileName} .`, 
+        'wordpress'
       );
     } catch (error) {
       console.error('Command error:', error);
@@ -423,7 +431,7 @@ async findPercent(setupId: number) {
 
 
 async createDownloadableBackup(setupId: number) {
-  const backup = await this.createManualBackupToPod(setupId, 'downloadable');
+  const backup = await this.createManualBackupToPod(setupId, 'downloadable', ''); 
   const setup = await this.setupService.findOne(backup.setupId);
   const backupFilePath = `/backups/${backup.name}`;
   const sqlFilePath = `/backups/${backup.name.replace('.zip', '.sql')}`;
@@ -432,24 +440,38 @@ async createDownloadableBackup(setupId: number) {
   const s3Bucket = process.env.AWS_S3_BUCKET;
   const s3DestinationPath = `s3://${s3Bucket}/${backup.name.replace('.zip', '_combined.zip')}`;
 
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get update -qq');
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get install -y s3cmd zip -qq');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get update -qq', 'wordpress');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get install -y s3cmd zip -qq', 'wordpress');
 
   const zipCommand = `zip -j ${combinedZipPath} ${backupFilePath} ${sqlFilePath}`;
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, zipCommand);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, zipCommand, 'wordpress');
 
   const s3CmdCommand = `s3cmd put ${combinedZipPath} ${s3DestinationPath} --access_key=${process.env.AWS_ACCES_KEY} --secret_key=${process.env.AWS_SECRET_ACCESS_KEY} --region eu-north-1`;
-  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, s3CmdCommand);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, s3CmdCommand, 'wordpress');
 
   const presignedUrl = await this.s3Service.getPresignedUrl(backup.name.replace('.zip', '_combined.zip'));
 
+
+  const nowTime = new Date();
+  const expiry = new Date(nowTime.getTime() + 24 * 60 * 60 * 1000); 
+  const formattedExpiry = dayjs(expiry).format("MMM DD , YYYY , hh : mm A");
+
+
   backup.s3ZippedUrl = presignedUrl;
   backup.s3SqlUrl = presignedUrl;  
-
-  return backup;
+  await this.backupRepository.createDonwloadableBackup(backup.name, backup.setupId, backup.instanceId, backup.type, backup.whereGo, backup.s3ZippedUrl, formattedExpiry); 
+  await this.backupRepository.deleteBackup(backup.id)
+  return {
+    createdAt: backup.formatedCreatedAt,
+    expiry: formattedExpiry,
+    s3ZippedUrl: backup.s3ZippedUrl
+  };
 }
 
 
+  async findDonwloadablebackups(setupId: number) {
+    return await this.backupRepository.findDonwloadablebackups(setupId)
+  }
 
 
 }

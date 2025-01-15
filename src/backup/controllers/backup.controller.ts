@@ -24,7 +24,7 @@ export class BackupController {
   @Post('manualtopod/:setupId')
   async createManualBackupToPod(@Param('setupId') setupId:string) {
     const backupType = 'manual'
-    return await this.backupService.createManualBackupToPod(Number(setupId), backupType)
+    return await this.backupService.createManualBackupToPod(Number(setupId), backupType, '')
   }
 
   @Roles(Role.USER)
@@ -112,4 +112,11 @@ export class BackupController {
   @Get('percent/:setupId')
   async findPercent(@Param('setupId') setupId:string) {
     return await this.backupService.findPercent(Number(setupId))
-  }}
+  }
+
+  @Roles(Role.USER)
+  @Get('downloadable/:setupId')
+  async findDonwloadablebackups(@Param('setupId') setupId:string) {
+    return await this.backupService.findDonwloadablebackups(Number(setupId))
+  }
+}

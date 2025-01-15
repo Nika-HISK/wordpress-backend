@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Param } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { Backup } from '../entities/backup.entity';
 import { FilesService } from 'src/files/services/files.service';
@@ -38,7 +38,7 @@ export class BackupRepository {
   }
 
 
-  async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string) {
+  async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, s3ZippedUrl: string) {
     const newDate = new Date();
     const formattedDate = dayjs(newDate).format("MMM DD , YYYY , hh : mm A").toString();
 
@@ -49,10 +49,29 @@ export class BackupRepository {
     newBackup.type = backupType
     newBackup.whereGo = whereGo
     newBackup.formatedCreatedAt = formattedDate
+    newBackup.s3ZippedUrl = s3ZippedUrl
   
     return await this.backupRepository.save(newBackup)
   
     }
+
+    async createDonwloadableBackup(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, s3ZippedUrl: string, expiry: string) {
+      const newDate = new Date();
+      const formattedDate = dayjs(newDate).format("MMM DD , YYYY , hh : mm A").toString();
+  
+      const newBackup = new Backup()
+      newBackup.name = backupName
+      newBackup.setupId = setupId
+      newBackup.instanceId = instanceId
+      newBackup.type = backupType
+      newBackup.whereGo = whereGo
+      newBackup.formatedCreatedAt = formattedDate
+      newBackup.s3ZippedUrl = s3ZippedUrl
+      newBackup.expiry = expiry
+    
+      return await this.backupRepository.save(newBackup)
+    
+      }
 
     async createManulToPodWithLimit(
       backupName: string, 
@@ -140,5 +159,21 @@ export class BackupRepository {
       },
     });
   }
+
+  
+  async findDonwloadablebackups(setupId: number) {
+    return await this.backupRepository
+      .createQueryBuilder("backup")
+      .select([
+        "backup.id AS id",
+        "backup.formatedCreatedAt AS formatedCreatedAt",
+        "backup.expiry AS expiry",
+        "backup.s3ZippedUrl AS s3ZippedUrl",
+      ])
+      .where("backup.setupId = :setupId", { setupId })
+      .andWhere("backup.type = :type", { type: 'downloadable' })
+      .getRawMany();
+  }
+  
   
 }
