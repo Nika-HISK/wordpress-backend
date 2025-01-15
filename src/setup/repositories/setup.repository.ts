@@ -67,7 +67,8 @@ export class SetupRepository {
     mysqlPassword: string,
     siteName: string,
     phpAdminFullIp: string,
-    instanceId: string
+    instanceId: string,
+    phpDeployment: string
   ): Promise<Setup> {
     const encryptedMysqlPassword = this.encrypt(mysqlPassword);
     const hashedPassword = await bcrypt.hash(
@@ -95,6 +96,7 @@ export class SetupRepository {
     newSetup.mysqlPassword = encryptedMysqlPassword;
     newSetup.phpAdminFullIp = phpAdminFullIp
     newSetup.instanceId = instanceId
+    newSetup.phpDeployment = phpDeployment
 
     return await this.setupRepository.save(newSetup);
   }

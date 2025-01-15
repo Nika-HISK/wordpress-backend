@@ -63,6 +63,9 @@ export class Setup extends baseEntity {
   phpAdminFullIp: string
 
   @Column()
+  phpDeployment: string
+
+  @Column()
   mysqlPassword: string;
 
   @ManyToOne(() => User, (user) => user.setup)

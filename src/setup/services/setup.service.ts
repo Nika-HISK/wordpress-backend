@@ -524,6 +524,7 @@ export class SetupService {
     );
     const wpDeployment = `wordpress-${instanceId}`;
     const sqlDeployment = `mysql-${instanceId}`;
+    const phpDeployment = `phpadmin-${instanceId}`
     const replicaSets = await this.k8sService.listReplicaSets(namespace);
     const wpReplicaSet = replicaSets.find((rs) =>
       rs.metadata?.ownerReferences?.some(
@@ -566,7 +567,8 @@ export class SetupService {
       mysqlPassword,
       siteName,
       phpAdminFullIp,
-      instanceId
+      instanceId,
+      phpDeployment
     );
 
     await this.updateNginxErrorLogLevel(namespace, podName, 'debug',);
@@ -584,12 +586,64 @@ export class SetupService {
         throw new NotFoundException(`Setup with ID ${setupId} not found`);
       }
 
+      const wpService = `wordpress-${setup.instanceId}`
+      const sqlService = `mysql-${setup.instanceId}`
+      const phpService = `phpadmin-${setup.instanceId}`
+      const nginxConfig = `nginx-config-${setup.instanceId}`
+      const wpPvc = `wordpress-pvc-${setup.instanceId}`
+      const sqlPvc = `mysql-pvc-${setup.instanceId}`
+      const sqlSecret = `mysql-secret-${setup.instanceId}`
+
+
       await execAsync(
         `kubectl delete deployment ${setup.wpDeployment} -n ${setup.nameSpace}`,
       );
       await execAsync(
         `kubectl delete deployment ${setup.sqlDeployment} -n ${setup.nameSpace}`,
       );
+
+      await execAsync(
+        `kubectl delete deployment ${setup.phpDeployment} -n ${setup.nameSpace}`,
+      );
+
+      await execAsync(
+        `kubectl delete service ${wpService} -n ${setup.nameSpace}`,
+      );
+
+      await execAsync(
+        `kubectl delete service ${sqlService} -n ${setup.nameSpace}`,
+      );
+
+      await execAsync(
+        `kubectl delete service ${phpService} -n ${setup.nameSpace}`,
+      );
+
+      await execAsync(
+        `kubectl delete configmap ${nginxConfig} -n ${setup.nameSpace}`,
+      );
+      await execAsync(
+        `kubectl delete pvc ${wpPvc} -n ${setup.nameSpace}`,
+      );
+
+      await execAsync(
+        `kubectl delete pvc ${sqlPvc} -n ${setup.nameSpace}`,
+      );
+
+      await execAsync(
+        `kubectl delete secret ${sqlSecret} -n ${setup.nameSpace}`,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
+      await new Promise<void>((resolve) => 
+      setTimeout(async () => {
+        await execAsync(
+          `kubectl get pv -o jsonpath='{range .items[?(@.status.phase=="Released")]}{.metadata.name}{"\n"}{end}' | xargs -I{} kubectl delete pv {} -n ${setup.nameSpace}`
+        );
+        resolve();
+      }, 5000)
+    );
+        
       return await this.setupRepository.deleteSetup(setupId);
     } catch (error) {
       throw new InternalServerErrorException(
