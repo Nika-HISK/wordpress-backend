@@ -426,43 +426,25 @@ async createDownloadableBackup(setupId: number) {
   const backup = await this.createManualBackupToPod(setupId, 'downloadable');
   const setup = await this.setupService.findOne(backup.setupId);
   const backupFilePath = `/backups/${backup.name}`;
+  const sqlFilePath = `/backups/${backup.name.replace('.zip', '.sql')}`;
+  const combinedZipPath = `/backups/${backup.name.replace('.zip', '_combined.zip')}`;
 
   const s3Bucket = process.env.AWS_S3_BUCKET;
-  const s3DestinationPath = `s3://${s3Bucket}/${backup.name}`;
-  console.log(s3Bucket, 'backueeeeett');
-  
+  const s3DestinationPath = `s3://${s3Bucket}/${backup.name.replace('.zip', '_combined.zip')}`;
 
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get update -qq');
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get install -y s3cmd zip -qq');
 
-  console.log(process.env.AWS_ACCES_KEY, '<- access key');
-  console.log(process.env.AWS_SECRET_ACCESS_KEY, '<- secret acces key');
+  const zipCommand = `zip -j ${combinedZipPath} ${backupFilePath} ${sqlFilePath}`;
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, zipCommand);
 
+  const s3CmdCommand = `s3cmd put ${combinedZipPath} ${s3DestinationPath} --access_key=${process.env.AWS_ACCES_KEY} --secret_key=${process.env.AWS_SECRET_ACCESS_KEY} --region eu-north-1`;
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, s3CmdCommand);
 
-
-
-  await this.setupService.runKubectlCommand(
-    setup.nameSpace,
-    setup.podName,
-    '/usr/bin/apt-get update -qq'
-  );
-
-    await this.setupService.runKubectlCommand(
-    setup.nameSpace,
-    setup.podName,
-    '/usr/bin/apt-get install -y s3cmd zip -qq'
-  );
-    console.log(' aketebs apt update');
-
-    const s3CmdCommand = `s3cmd put ${backupFilePath} ${s3DestinationPath} --access_key=${process.env.AWS_ACCES_KEY} --secret_key=${process.env.AWS_SECRET_ACCESS_KEY} --region eu-north-1`;
-  
-  await this.setupService.runKubectlCommand(
-    setup.nameSpace,
-    setup.podName,
-    s3CmdCommand
-  );
-
-  const presignedUrl = await this.s3Service.getPresignedUrl(backup.name);
+  const presignedUrl = await this.s3Service.getPresignedUrl(backup.name.replace('.zip', '_combined.zip'));
 
   backup.s3ZippedUrl = presignedUrl;
+  backup.s3SqlUrl = presignedUrl;  
 
   return backup;
 }
