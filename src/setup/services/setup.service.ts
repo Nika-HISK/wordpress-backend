@@ -26,7 +26,7 @@ export class SetupService {
     const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -c ${containerName} -- ${command}`;
     
     try {
-      const { stdout, stderr } = await execAsync(kubectlCommand, {maxBuffer: 99999999});
+      const { stdout, stderr } = await execAsync(kubectlCommand, {maxBuffer: Infinity});
       if (stderr) {
         console.error(`Error executing command "${command}":`, stderr);
       }

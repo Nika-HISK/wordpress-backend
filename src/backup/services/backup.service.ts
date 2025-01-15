@@ -12,6 +12,7 @@ import * as os from 'os';
 import { CreateBackupDto } from '../dto/create-backup.dto';
 import * as path from 'path';
 import { wpcliService } from 'src/wpcli/services/wpcli.service';
+import { PassThrough } from 'stream';
 const dayjs = require('dayjs');
 
 
@@ -419,27 +420,54 @@ async findPercent(setupId: number) {
 
 
 
+
+
 async createDownloadableBackup(setupId: number) {
   const backup = await this.createManualBackupToPod(setupId, 'downloadable');
   const setup = await this.setupService.findOne(backup.setupId);
   const backupFilePath = `/backups/${backup.name}`;
 
-  const fileContent = await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `cat ${backupFilePath}`);
+  const s3Bucket = process.env.AWS_S3_BUCKET;
+  const s3DestinationPath = `s3://${s3Bucket}/${backup.name}`;
+  console.log(s3Bucket, 'backueeeeett');
   
-  const buffer = Buffer.from(fileContent);
 
-  const uploadResult = await this.filesService.uploadFile({
-    originalname: backup.name,
-    mimetype: 'application/zip',
-    buffer: buffer,
-  } as Express.Multer.File);
 
-  const fileKey = uploadResult.key;
-  const presignedUrl = await this.s3Service.getPresignedUrl(fileKey);
+  console.log(process.env.AWS_ACCES_KEY, '<- access key');
+  console.log(process.env.AWS_SECRET_ACCESS_KEY, '<- secret acces key');
+
+
+
+
+  await this.setupService.runKubectlCommand(
+    setup.nameSpace,
+    setup.podName,
+    '/usr/bin/apt-get update -qq'
+  );
+
+    await this.setupService.runKubectlCommand(
+    setup.nameSpace,
+    setup.podName,
+    '/usr/bin/apt-get install -y s3cmd zip -qq'
+  );
+    console.log(' aketebs apt update');
+
+    const s3CmdCommand = `s3cmd put ${backupFilePath} ${s3DestinationPath} --access_key=${process.env.AWS_ACCES_KEY} --secret_key=${process.env.AWS_SECRET_ACCESS_KEY} --region eu-north-1`;
+  
+  await this.setupService.runKubectlCommand(
+    setup.nameSpace,
+    setup.podName,
+    s3CmdCommand
+  );
+
+  const presignedUrl = await this.s3Service.getPresignedUrl(backup.name);
 
   backup.s3ZippedUrl = presignedUrl;
+
   return backup;
 }
+
+
 
 
 }
