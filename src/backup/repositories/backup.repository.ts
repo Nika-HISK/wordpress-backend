@@ -55,7 +55,7 @@ export class BackupRepository {
   
     }
 
-    async createDonwloadableBackup(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, s3ZippedUrl: string, expiry: string) {
+    async createDonwloadableBackup(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, s3ZippedUrl: string, expiry: string, enableDownloadableDate: string) {
       const newDate = new Date();
       const formattedDate = dayjs(newDate).format("MMM DD , YYYY , hh : mm A").toString();
   
@@ -68,6 +68,7 @@ export class BackupRepository {
       newBackup.formatedCreatedAt = formattedDate
       newBackup.s3ZippedUrl = s3ZippedUrl
       newBackup.expiry = expiry
+      newBackup.enableDownloadableDate = enableDownloadableDate 
     
       return await this.backupRepository.save(newBackup)
     
@@ -184,6 +185,14 @@ export class BackupRepository {
       .andWhere("backup.type = :type", { type: 'downloadable' })
       .getRawMany();
   }
+  
+  async findByCreatedAt(setupId: number) {
+    return await this.backupRepository.findOne({
+      where: { setupId, type: 'downloadable' }, 
+      order: { createdAt: 'DESC' }
+    });  
+  }
+
   
   
 }

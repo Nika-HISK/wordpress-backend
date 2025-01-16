@@ -486,6 +486,25 @@ async createManualBackupToPodForS3(setupId: number, backupType: string, s3Zipped
 }
 
 
+async deleteBackupFromPodWithNames(backupId:number) {
+
+  const backup = await this.backupRepository.findOne(backupId)    
+  const setup = await this.setupService.findOne(backup.setupId)
+  const zippedName =  backup.name
+  const sqlName = zippedName.replace('.zip', '.sql')
+
+  
+
+  await execAsync(`
+  kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "rm /backups/${zippedName} && rm /backups/${sqlName}"
+  `);
+
+  await this.backupRepository.deleteBackup(backupId)
+
+
+  return `succesfully deleted backup from pod and db with backupId:${backupId}`
+}
+
 
 async createDownloadableBackup(setupId: number) {
   const backup = await this.createManualBackupToPodForS3(setupId, 'downloadable', ''); 
@@ -493,6 +512,22 @@ async createDownloadableBackup(setupId: number) {
   const backupFilePath = `/backups/${backup.name}`;
   const sqlFilePath = `/backups/${backup.name.replace('.zip', '.sql')}`;
   const combinedZipPath = `/backups/${backup.name.replace('.zip', '_combined.zip')}`;
+
+
+  const lastBackup = await this.backupRepository.findByCreatedAt(setupId)
+    
+
+  const createdAt = new Date() 
+  const preWeekDate = createdAt.getTime() +  7 * 24 * 60 * 60 * 1000
+
+  const formatedEnableDownloadableDate = dayjs(preWeekDate).format("MMM DD , YYYY , hh : mm A");
+
+
+  if(lastBackup != null) {    
+    if (new Date().getTime() - lastBackup.createdAt.getTime() < 7 * 24 * 60 * 60 * 1000) {
+      throw new HttpException(`You will be able to create a new backup at ${formatedEnableDownloadableDate}`, HttpStatus.BAD_REQUEST);
+    }
+  }
 
   const s3Bucket = process.env.AWS_S3_BUCKET;
   const s3DestinationPath = `s3://${s3Bucket}/${backup.name.replace('.zip', '_combined.zip')}`;
@@ -514,7 +549,10 @@ async createDownloadableBackup(setupId: number) {
   const formattedExpiry = dayjs(expiry).format("MMM DD , YYYY , hh : mm A");
 
 
-   const finnalBackup = await this.backupRepository.createDonwloadableBackup(backup.name, backup.setupId, backup.instanceId, backup.type, backup.whereGo, presignedUrl, formattedExpiry); 
+   const finnalBackup = await this.backupRepository.createDonwloadableBackup(backup.name, backup.setupId, backup.instanceId, backup.type, backup.whereGo, presignedUrl, formattedExpiry, formatedEnableDownloadableDate); 
+   setTimeout(async () => {
+      await this.deleteBackupFromS3(finnalBackup.id)
+    },86400000);
   return {
     createdAt: finnalBackup.formatedCreatedAt,
     expiry: formattedExpiry,

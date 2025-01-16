@@ -41,5 +41,7 @@ export class Backup extends baseEntity {
   @Column({nullable: true})
   formatedCreatedAt: string
 
+  @Column({nullable: true})
+  enableDownloadableDate: string
 
 }
