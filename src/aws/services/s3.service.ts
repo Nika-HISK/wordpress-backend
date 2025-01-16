@@ -59,4 +59,18 @@ export class s3Service {
       throw new Error(`Unable to generate presigned URL: ${error.message}`);
     }
   }
+
+  async deleteFile(bucketName: string, fileKey: string): Promise<void> {
+    const params = {
+      Bucket: bucketName,
+      Key: fileKey,
+    };
+  
+    try {
+      await this.s3Client.deleteObject(params).promise();
+    } catch (error) {
+      throw new Error(`Failed to delete file from S3: ${error.message}`);
+    }
+  }
+  
 }

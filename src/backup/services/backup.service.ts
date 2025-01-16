@@ -309,12 +309,11 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
 
   async createManualWithLimit(setupId: number, backupType: string, createBackupDto: CreateBackupDto) {
     const existingBackups = await this.backupRepository.findBySetupId(setupId);
-    const limitedLength = existingBackups.length
     if (existingBackups.length >= 5) {
         throw new HttpException('You cannot create more than 5 backups', HttpStatus.BAD_REQUEST);
     }
 
-    const backup = await this.createManualBackupToPodForLimit(setupId, backupType, createBackupDto, limitedLength);
+    const backup = await this.createManualBackupToPodForLimit(setupId, backupType, createBackupDto);
 
     setTimeout(async () => {
         try {
@@ -328,7 +327,7 @@ private scheduleBackupDeletion(backupId: number, delay: number) {
 }
 
 
-  async createManualBackupToPodForLimit(setupId: number, backupType: string, createBackupDto: CreateBackupDto, limitedLength: number) {
+  async createManualBackupToPodForLimit(setupId: number, backupType: string, createBackupDto: CreateBackupDto) {
     const whereGo = 'pod';
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
@@ -426,12 +425,70 @@ async findPercent(setupId: number) {
 }
 
 
+async createManualBackupToPodForS3(setupId: number, backupType: string, s3ZippedUrl: string) {
+  const whereGo = 'pod';
+  const setup = await this.setupService.findOne(setupId);
+  const instanceId = crypto.randomBytes(4).toString('hex');
 
+  const zipFileName = `${setup.siteName}-${instanceId}.zip`;
+  const sqlFileName = `${setup.siteName}-${instanceId}.sql`;
+
+
+
+  try {
+      await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      '/usr/bin/apt-get update -qq', 
+      'wordpress'
+    );
+  
+      await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      '/usr/bin/apt-get install -y mariadb-client zip -qq'
+    );
+  
+     await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      'mkdir -p /backups',
+      'wordpress'
+    );
+  
+     await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      `wp db export /backups/${sqlFileName} --allow-root`,
+      'wordpress'
+    );
+  
+     await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      `zip -r /backups/${zipFileName} .`,
+      'wordpress'
+    );
+  } catch (error) {
+    console.error('Command error:', error);
+  }
+
+  const backup = {
+      name: zipFileName,
+      setupId: setupId,
+      instanceId: instanceId,
+      type: backupType,
+      whereGo: whereGo,
+      s3ZippedUrl: s3ZippedUrl,
+  };
+
+  return backup;
+}
 
 
 
 async createDownloadableBackup(setupId: number) {
-  const backup = await this.createManualBackupToPod(setupId, 'downloadable', ''); 
+  const backup = await this.createManualBackupToPodForS3(setupId, 'downloadable', ''); 
   const setup = await this.setupService.findOne(backup.setupId);
   const backupFilePath = `/backups/${backup.name}`;
   const sqlFilePath = `/backups/${backup.name.replace('.zip', '.sql')}`;
@@ -457,21 +514,54 @@ async createDownloadableBackup(setupId: number) {
   const formattedExpiry = dayjs(expiry).format("MMM DD , YYYY , hh : mm A");
 
 
-  backup.s3ZippedUrl = presignedUrl;
-  backup.s3SqlUrl = presignedUrl;  
-  await this.backupRepository.createDonwloadableBackup(backup.name, backup.setupId, backup.instanceId, backup.type, backup.whereGo, backup.s3ZippedUrl, formattedExpiry); 
-  await this.backupRepository.deleteBackup(backup.id)
+   const finnalBackup = await this.backupRepository.createDonwloadableBackup(backup.name, backup.setupId, backup.instanceId, backup.type, backup.whereGo, presignedUrl, formattedExpiry); 
   return {
-    createdAt: backup.formatedCreatedAt,
+    createdAt: finnalBackup.formatedCreatedAt,
     expiry: formattedExpiry,
-    s3ZippedUrl: backup.s3ZippedUrl
+    s3ZippedUrl: presignedUrl
   };
 }
+
+
+async deleteBackupFromS3(backupId: number) {
+  const backup = await this.backupRepository.findOne(backupId);
+  if (!backup) {
+    throw new Error('Backup not found');
+  }
+  const setup = await this.setupService.findOne(backup.setupId)
+
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `rm -f /backups/${backup.name}`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `rm -f /backups/${backup.name.replace('.zip', '.sql')}`);
+  await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `rm -f /backups/${backup.name.replace('.zip', '_combined.zip')}`);
+
+
+  const s3Url = backup.s3ZippedUrl;
+  if (!s3Url) {
+    throw new Error('S3 URL not found for the backup');
+  }
+
+  const url = new URL(s3Url); 
+  const fileKey = decodeURIComponent(url.pathname.substring(1));
+
+  if (!fileKey) {
+    throw new Error('Unable to extract file key from S3 URL');
+  }
+
+  const bucketName = process.env.AWS_S3_BUCKET;
+  await this.s3Service.deleteFile(bucketName, fileKey);
+
+  await this.backupRepository.deleteBackup(backupId);
+
+  return {
+    message: `Backup with ID ${backupId} has been successfully deleted.`,
+  };
+}
+
+
 
 
   async findDonwloadablebackups(setupId: number) {
     return await this.backupRepository.findDonwloadablebackups(setupId)
   }
-
 
 }

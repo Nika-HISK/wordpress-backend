@@ -1,4 +1,4 @@
-import { Injectable, Param } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Param } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { Backup } from '../entities/backup.entity';
 import { FilesService } from 'src/files/services/files.service';
@@ -106,8 +106,18 @@ export class BackupRepository {
 
 
   async findOne(backupId: number) {
-    return await this.backupRepository.findOneBy({id: backupId})
+    const backup = await this.backupRepository.findOneBy({ id: backupId });
+  
+    if (!backup) {
+      throw new HttpException(
+        `Backup with id ${backupId} not found`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  
+    return backup;
   }
+  
 
   async deleteBackup(backupId: number) {
     return await this.backupRepository.softDelete(backupId) 
@@ -126,7 +136,7 @@ export class BackupRepository {
   
     return this.backupRepository.createQueryBuilder('backup')
       .where('backup.setupId = :setupId', { setupId })
-      .andWhere('backup.type = :backupType', { backupType }) // Ensure key matches the binding name
+      .andWhere('backup.type = :backupType', { backupType }) 
       .orderBy('backup.createdAt', 'DESC')
       .getMany();
   }

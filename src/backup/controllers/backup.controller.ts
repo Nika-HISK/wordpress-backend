@@ -46,9 +46,16 @@ export class BackupController {
   }
 
   @Roles(Role.USER)
-  @Delete('deletebackupFromPod/:backupId')
+  @Delete('deletefrompod/:backupId')
   async deleteBackupFromPod(@Param('backupId') backupId:string) {
     return await this.backupService.deleteBackupFromPod(Number(backupId))
+  }
+
+
+  @Roles(Role.USER)
+  @Delete('deletefroms3/:backupId')
+  async deleteBackupFromS3(@Param('backupId') backupId:string) {
+    return await this.backupService.deleteBackupFromS3(Number(backupId))
   }
 
   @Roles(Role.USER)    
