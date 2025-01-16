@@ -44,4 +44,13 @@ export class Backup extends baseEntity {
   @Column({nullable: true})
   enableDownloadableDate: string
 
+  @Column({nullable: true})
+  bucket: string
+
+  @Column({nullable: true})
+  accessKey: string
+
+  @Column({nullable: true})
+  accessSecretKey: string
+
 }

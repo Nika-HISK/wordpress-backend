@@ -13,6 +13,7 @@ import { CreateBackupDto } from '../dto/create-backup.dto';
 import * as path from 'path';
 import { wpcliService } from 'src/wpcli/services/wpcli.service';
 import { PassThrough } from 'stream';
+import { CreateS3BackupDto } from '../dto/create-s3Backup.dto';
 const dayjs = require('dayjs');
 
 
@@ -34,38 +35,128 @@ export class BackupService {
   private backupInterval: NodeJS.Timeout;
 
 
-  
-  async createManualToS3(setupId: number, createBackupDto: CreateBackupDto) {
-    const whereGo = 's3'
+  async createManualBackupToPodForCreateS3(setupId: number) {
     const setup = await this.setupService.findOne(setupId);
     const instanceId = crypto.randomBytes(4).toString('hex');
+
+    const zipFileName = `${setup.siteName}-${instanceId}.zip`;
+    const sqlFileName = `${setup.siteName}-${instanceId}.sql`;
+
+
+    try {
+        await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        '/usr/bin/apt-get update -qq', 
+        'wordpress'
+      );
+    
+        await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        '/usr/bin/apt-get install -y mariadb-client zip -qq'
+      );
+    
+       await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        'mkdir -p /backups',
+        'wordpress'
+      );
+    
+       await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        `wp db export /backups/${sqlFileName} --allow-root`,
+        'wordpress'
+      );
+    
+       await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        `zip -r /backups/${zipFileName} .`,
+        'wordpress'
+      );
+    } catch (error) {
+      console.error('Command error:', error);
+    }
+
+    // backupName: string, setupId: number, instanceId: string, s3ZippedUrl: string, backupType: string, whereGo: string, createBackupDto: CreateBackupDto, s3SqlUrl: string
+
+
+
+    return {
+      name: zipFileName,
+      setupId: setupId,
+      instanceId: instanceId
+    };
+}
+
+  
+  async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
+    const backup = await this.createManualBackupToPodForCreateS3(setupId);
+    const setup = await this.setupService.findOne(backup.setupId);
+    const backupFilePath = `/backups/${backup.name}`;
+    const sqlFilePath = `/backups/${backup.name.replace('.zip', '.sql')}`
+  
+    const s3Bucket = createS3BackupDto.bucket;
+    const s3DestinationPath = `s3://${s3Bucket}/${backup.name}`;
+    const s3SqlDestinationPath = `s3://${s3Bucket}/${backup.name.replace('.zip', '.sql')}`  
+  
+    await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      '/usr/bin/apt-get update -qq'
+    );
+  
+      await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      '/usr/bin/apt-get install -y s3cmd zip -qq'
+    );
+  
+      const s3CmdCommand = `s3cmd put ${backupFilePath} ${s3DestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
+      const s3SqlCmdCommand = `s3cmd put ${sqlFilePath} ${s3SqlDestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
+ 
+      try {
+         
+    await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      s3CmdCommand
+    );
+
+    await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      s3SqlCmdCommand
+    );
+      } catch(error) {
+        throw new HttpException('bucket accessKey or accessSecretKey is incorrect', HttpStatus.BAD_REQUEST)
+      }
+
     const backupType = 'manual'
+    const whereGo = 'pod';
+  
+    const presignedUrl = await this.s3Service.getPresignedUrl(backup.name);
+    const sqlPresignedUrl = await this.s3Service.getPresignedUrl(backup.name.replace('.zip', '.sql'))
 
-    const sanitizedSiteName = setup.siteName.replace(/\s+/g, '-'); 
-    const backupName = `${sanitizedSiteName}-${instanceId}.sql`;
-    const zipFileName = `${sanitizedSiteName}-${instanceId}.zip`;
 
-    const tempZipPath = os.platform() === 'win32' ? `${process.env.TEMP}\\${zipFileName}` : `/tmp/${zipFileName}`;
 
-    await execAsync(`
-      kubectl exec -it -n ${setup.nameSpace} ${setup.podName} -c wordpress -- sh -c "apt update && apt install -y mariadb-client zip && wp db export '${backupName}' --allow-root && zip '${zipFileName}' '${backupName}'"
-    `);
-
-    await execAsync(`
-      kubectl cp "${setup.nameSpace}/${setup.podName}:/var/www/html/${zipFileName}" "${tempZipPath}"
-    `);
-    const fileContent = fs.readFileSync(tempZipPath);
-    const uploadResult = await this.filesService.uploadFile({
-      originalname: zipFileName,
-      mimetype: 'application/zip',
-      buffer: fileContent,
-    } as Express.Multer.File);
-
-    await execAsync(`rm -f ${tempZipPath}`);
-    const backup = await this.backupRepository.createManualS3Backup(zipFileName, setupId, instanceId, uploadResult.url, backupType, whereGo, createBackupDto, '');
-
-    return backup;
+    const finallBackup = await this.backupRepository.createManualS3Backup(
+      backup.name,
+      setupId,
+      backup.instanceId,
+      presignedUrl,
+      backupType,
+      whereGo,
+      createS3BackupDto,
+      sqlPresignedUrl
+  );
+    return finallBackup;
   }
+  
+
 
 
 
@@ -391,9 +482,11 @@ findManualBackups() {
   return this.backupRepository.findManualBackups()
 }
 
+
 findDailyBackups() {
   return this.backupRepository.findDailyBackups()
 }
+
 
 findHourlyBackups() {
   return this.backupRepository.findHourlyBackups()
@@ -404,9 +497,11 @@ findSixHourlyBackups() {
 }
 
 
+
 findManualLimited(setupId:number) {
   return this.backupRepository.findManualLimitedBysetypId(setupId)
 }
+
 
 async findPercent(setupId: number) {
   const maximum = 5
@@ -432,8 +527,6 @@ async createManualBackupToPodForS3(setupId: number, backupType: string, s3Zipped
 
   const zipFileName = `${setup.siteName}-${instanceId}.zip`;
   const sqlFileName = `${setup.siteName}-${instanceId}.sql`;
-
-
 
   try {
       await this.setupService.runKubectlCommand(
@@ -594,8 +687,6 @@ async deleteBackupFromS3(backupId: number) {
     message: `Backup with ID ${backupId} has been successfully deleted.`,
   };
 }
-
-
 
 
   async findDonwloadablebackups(setupId: number) {

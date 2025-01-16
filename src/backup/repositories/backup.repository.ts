@@ -8,6 +8,7 @@ import { CreateBackupDto } from '../dto/create-backup.dto';
 import { SetupService } from 'src/setup/services/setup.service';
 import { Json } from 'aws-sdk/clients/robomaker';
 import { String } from 'aws-sdk/clients/appstream';
+import { CreateS3BackupDto } from '../dto/create-s3Backup.dto';
 const dayjs = require('dayjs');
 
 @Injectable()
@@ -20,7 +21,7 @@ export class BackupRepository {
     private readonly setupService: SetupService
   ) {}
 
-  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3ZippedUrl: string, backupType: string, whereGo: string, createBackupDto: CreateBackupDto, s3SqlUrl: string) {
+  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3ZippedUrl: string, backupType: string, whereGo: string, createS3BackupDto: CreateS3BackupDto, s3SqlUrl: string) {
   
 
   const newBackup = new Backup()
@@ -30,8 +31,11 @@ export class BackupRepository {
   newBackup.s3ZippedUrl = s3ZippedUrl
   newBackup.type = backupType
   newBackup.whereGo = whereGo
-  newBackup.note = createBackupDto.note
   newBackup.s3SqlUrl = s3SqlUrl
+  newBackup.bucket = createS3BackupDto.bucket
+  newBackup.accessKey = createS3BackupDto.accessKey
+  newBackup.accessSecretKey = createS3BackupDto.accessSecretKey
+
 
   return await this.backupRepository.save(newBackup)
 

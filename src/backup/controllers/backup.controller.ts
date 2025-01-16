@@ -3,6 +3,7 @@ import { BackupService } from '../services/backup.service';
 import { CreateBackupDto } from '../dto/create-backup.dto';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
+import { CreateS3BackupDto } from '../dto/create-s3Backup.dto';
 
 @Controller('backup')
 export class BackupController {
@@ -10,8 +11,8 @@ export class BackupController {
 
   @Roles(Role.USER)
   @Post('manualtos3/:setupId')
-  async createManualToS3(@Param('setupId') setupId:string, @Body() createBackupDto: CreateBackupDto) {
-    return await this.backupService.createManualToS3(Number(setupId), createBackupDto)
+  async createManualToS3(@Param('setupId') setupId:string, @Body() createS3BackupDto: CreateS3BackupDto) {
+    return await this.backupService.createManualToS3(Number(setupId), createS3BackupDto)
   }
 
   @Roles(Role.USER)
