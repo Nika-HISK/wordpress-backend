@@ -408,76 +408,80 @@ export class KubernetesService {
     action: 'add' | 'remove'
   ) {
     try {
-      console.log(setupId);
-      console.log('Setup Repository:', this.setupRepository)
-      
+      console.log(`Processing setupId: ${setupId}`);
+  
       const setup = await this.setupRepository.findOne({ where: { id: setupId } });
-      console.log(setup);
-      
-      const instanceId = setup.instanceId
-      const namespace = setup.nameSpace
-
+      if (!setup) throw new Error(`Setup with ID ${setupId} not found`);
+  
+      const instanceId = setup.instanceId;
+      const namespace = setup.nameSpace;
+  
       // Fetch the existing ConfigMap
       const { body } = await this.coreApi.readNamespacedConfigMap(
         `nginx-config-${instanceId}`,
         namespace
       );
   
-      // If ConfigMap doesn't exist, throw an error
       if (!body || !body.data || !body.data['default.conf']) {
         throw new Error('Nginx ConfigMap not found or missing default.conf');
       }
   
-
       let nginxConfig = body.data['default.conf'];
   
-
+      // Construct the redirect rule
       const redirectRule = `
-        location = ${oldUrl} {
-            return ${statusCode} ${newUrl};
-            add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate";
-        }
-      `;
+      location = ${oldUrl} {
+          return ${statusCode} ${newUrl};
+          add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate";
+      }`.trim();
   
-      // console.log('Current Nginx Config:');
-      // console.log(nginxConfig); 
-  
-
       if (action === 'remove') {
-        console.log('Removing redirect rule:', redirectRule);
-        nginxConfig = nginxConfig.replace(redirectRule, '');
+        console.log(`Removing redirect rule for URL: ${oldUrl}`);
+        const ruleRegex = new RegExp(
+          `\\s*location\\s*=\\s*${oldUrl}\\s*{[^}]*}\\s*`,
+          'g'
+        );
+        nginxConfig = nginxConfig.replace(ruleRegex, '').trim();
       }
   
-
       if (action === 'add') {
-        console.log('Adding redirect rule:', redirectRule);
+        console.log(`Adding redirect rule: ${oldUrl} -> ${newUrl}`);
+        const serverBlockRegex = /server\s*{([\s\S]*?)}/;
+        const match = nginxConfig.match(serverBlockRegex);
   
-
-        const serverBlockStart = nginxConfig.indexOf('server {');
-        const serverBlockEnd = nginxConfig.indexOf('}', serverBlockStart);
+        if (match) {
+          const serverContent = match[1].trim();
   
-
-        if (serverBlockStart !== -1 && serverBlockEnd !== -1) {
-          nginxConfig =
-            nginxConfig.slice(0, serverBlockEnd) +
-            '\n' +
-            redirectRule +
-            nginxConfig.slice(serverBlockEnd);
+          // Ensure the rule is not already present
+          if (!serverContent.includes(`location = ${oldUrl}`)) {
+            const updatedServerContent = `${serverContent}\n\n${redirectRule}`;
+            nginxConfig = nginxConfig.replace(
+              serverBlockRegex,
+              `server {\n${updatedServerContent}\n}`
+            );
+          } else {
+            console.log(`Redirect rule for ${oldUrl} already exists.`);
+          }
+        } else {
+          throw new Error('No valid server block found in the configuration.');
         }
       }
   
-
-      await this.redirectRepository.save({
-        setupId: setupId,
-        oldUrl,
-        newUrl,
-        statusCode,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    
+      // Save the redirect to the database
+      if (action === 'add') {
+        await this.redirectRepository.save({
+          setupId,
+          oldUrl,
+          newUrl,
+          statusCode,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } else if (action === 'remove') {
+        await this.redirectRepository.delete({ setupId, oldUrl });
+      }
   
-
+      // Prepare the updated ConfigMap
       const updatedConfigMapManifest = {
         apiVersion: 'v1',
         kind: 'ConfigMap',
@@ -490,18 +494,17 @@ export class KubernetesService {
         },
       };
   
-      console.log('Deleting existing ConfigMap...');
-      await this.coreApi.deleteNamespacedConfigMap(
-        `nginx-config-${instanceId}`,
-        namespace
-      );
-  
-      console.log('Applying updated ConfigMap...');
+      // Update ConfigMap
+      await this.coreApi.deleteNamespacedConfigMap(`nginx-config-${instanceId}`, namespace);
       await this.applyManifest(namespace, updatedConfigMapManifest);
-      console.log(setup.nameSpace, setup.podName, 'barroooooo');
-      
-        // await this.runKubectlCommand(setup.nameSpace, setup.podName, 'nginx -s reload', 'nginx')
-        // await this.runKubectlCommand(setup.nameSpace, setup.podName, 'nginx -s reload', 'nginx')
+  
+      // Validate and reload Nginx
+      console.log('Validating updated Nginx configuration...');
+      await new Promise((resolve) => setTimeout(resolve, 45000));
+      await this.runKubectlCommand(namespace, setup.podName, 'nginx -t', 'nginx');
+  
+      console.log('Reloading Nginx...');
+      await this.runKubectlCommand(namespace, setup.podName, 'nginx -s reload', 'nginx');
   
       console.log(`Redirect rule ${action}ed successfully: ${oldUrl} -> ${newUrl}`);
     } catch (error) {
@@ -509,8 +512,5 @@ export class KubernetesService {
       throw error;
     }
   }
-  
-  
-
   
 }

@@ -16,6 +16,6 @@ export class Redirect extends baseEntity {
   @Column()
   statusCode: 301 | 302;
 
-  @ManyToOne(() => Setup, (setup) => setup.redirects)
+  @ManyToOne(() => Setup, (setup) => setup.redirects, { cascade: true })
   setup: Setup;
 }
