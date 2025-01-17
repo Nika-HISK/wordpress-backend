@@ -32,6 +32,8 @@ export class UserRepository {
         'setup.wpfullIp',
         'setup.siteName',
         'setup.phpAdminFullIp',
+        'setup.lastSearched',
+        'setup.lastSearchedLength'
       ])
       .getOne();
   

@@ -420,25 +420,8 @@ async wpPluginDeactivate(setupId: number, plugins: string[]): Promise<string[]> 
   async wpSearchReplace(
     setupId: number,
     search: string,
-    replace: string,
-    options: Record<string, any> = {},
-  ) {
-    const args: string[] = ['search-replace', search, replace];
-
-    if (options.tables) {
-      args.push(...options.tables);
-    }
-
-    for (const [key, value] of Object.entries(options)) {
-      if (key === 'tables') continue;
-
-      if (typeof value === 'boolean') {
-        if (value) args.push(`--${key}`);
-      } else if (value !== undefined) {
-        args.push(`--${key}=${value}`);
-      }
-    }
-
+    replace?: string,
+  ) {  
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {
       throw new HttpException(
@@ -446,15 +429,36 @@ async wpPluginDeactivate(setupId: number, plugins: string[]): Promise<string[]> 
         HttpStatus.NOT_FOUND,
       );
     }
+    
+    let command = '';
 
-    const command = `wp search-replace ${args.join(' ')} --allow-root`;
-
-    return this.setupService.runKubectlCommand(
+    if (!replace) {
+      command = `wp search-replace '${search}' '' --dry-run --allow-root`;
+    }   
+    
+    if (search && replace) {
+      command = `wp search-replace '${search}' '${replace}' --allow-root`;
+    }
+    
+    const lastCommand = await this.setupService.runKubectlCommand(
       setup.nameSpace,
       setup.podName,
       command,
     );
+    
+    const match = lastCommand.match(/Success: (\d+) replacements to be made/);
+    const howMany = match ? parseInt(match[1], 10) : 0;
+
+    console.log(howMany, 'howmanyy');
+    
+      setup.lastSearched = search
+      setup.lastSearchedLength = howMany
+    await this.setupRepository.save(setup)
+    return lastCommand;
+    
   }
+  
+  
 
   async wpCoreCheckUpdate(setupId: number): Promise<any> {
     const command = 'wp core check-update --format=json --allow-root';

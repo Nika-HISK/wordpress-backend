@@ -68,6 +68,12 @@ export class Setup extends baseEntity {
   @Column()
   mysqlPassword: string;
 
+  @Column({nullable: true})
+  lastSearched: string;
+
+  @Column({nullable: true})
+  lastSearchedLength: number;
+
   @ManyToOne(() => User, (user) => user.setup)
   @JoinColumn({ name: 'userId' })
   user: User;

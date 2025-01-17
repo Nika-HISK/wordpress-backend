@@ -88,14 +88,12 @@ export class wpcliController {
     @Query('setupId') setupId: number,
     @Body('search') search: string,
     @Body('replace') replace: string,
-    @Body('options') options: Record<string, any>,
   ) {
     try {
       const result = await this.wpCliService.wpSearchReplace(
         setupId,
         search,
         replace,
-        options,
       );
       return {
         status: 'success',
