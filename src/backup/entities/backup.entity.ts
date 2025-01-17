@@ -53,4 +53,16 @@ export class Backup extends baseEntity {
   @Column({nullable: true})
   accessSecretKey: string
 
+  @Column({nullable: true})
+  files: boolean
+
+  @Column({nullable: true})
+  database: boolean
+
+  @Column({type:'enum', enum:['weekly', 'monthly'], nullable: true})
+  uploadFrequency: string;
+
+  @Column({nullable: true})
+  willBeCreatedAt: string
+
 }

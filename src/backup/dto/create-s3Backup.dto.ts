@@ -1,4 +1,4 @@
-import { IsString } from "class-validator";
+import { IsBoolean, IsEnum, IsString } from "class-validator";
 
 
 
@@ -11,4 +11,17 @@ export class CreateS3BackupDto {
 
     @IsString()
     accessSecretKey: string
+
+    @IsBoolean()
+    files: boolean
+
+    @IsBoolean()
+    database: boolean
+
+
+    
+    @IsEnum(['weekly', 'monthly'])
+    uploadFrequency: string;
+    
+
 }
