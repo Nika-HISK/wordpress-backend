@@ -433,11 +433,11 @@ async wpPluginDeactivate(setupId: number, plugins: string[]): Promise<string[]> 
     let command = '';
 
     if (!replace) {
-      command = `wp search-replace '${search}' '' --dry-run --allow-root`;
+      command = `wp search-replace "${search}" '' --dry-run --allow-root`;
     }   
     
     if (search && replace) {
-      command = `wp search-replace '${search}' '${replace}' --allow-root`;
+      command = `wp search-replace "${search}" '${replace}' --allow-root`;
     }
     
     const lastCommand = await this.setupService.runKubectlCommand(
