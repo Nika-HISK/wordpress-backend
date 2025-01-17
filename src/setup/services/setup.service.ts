@@ -323,7 +323,7 @@ export class SetupService {
               },
               {
                 name: 'wordpress',
-                image: 'wordpress:php8.1-fpm',
+                image: 'wordpress:php8.2-fpm',
                 ports: [{ containerPort: 9000 }],
                 env: [
                   {

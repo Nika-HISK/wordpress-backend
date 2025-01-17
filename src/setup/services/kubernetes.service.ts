@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import {
   KubeConfig,
   CoreV1Api,
@@ -16,7 +20,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Redirect } from '../entities/redirect.entity';
 const execAsync = promisify(exec);
 
-
 @Injectable()
 export class KubernetesService {
   private readonly logger = new Logger(KubernetesService.name);
@@ -27,11 +30,10 @@ export class KubernetesService {
   private visitCounts: Record<string, number> = {};
   private appsV1Api: AppsV1Api;
 
-
   @InjectRepository(Setup)
-  private setupRepository:Repository<Setup>
+  private setupRepository: Repository<Setup>;
   @InjectRepository(Redirect)
-  private redirectRepository:Repository<Redirect>
+  private redirectRepository: Repository<Redirect>;
   constructor() {
     this.kubeConfig = new KubeConfig();
     this.kubeConfig.loadFromDefault();
@@ -39,7 +41,6 @@ export class KubernetesService {
     this.appsApi = this.kubeConfig.makeApiClient(AppsV1Api);
     this.networkingApi = this.kubeConfig.makeApiClient(NetworkingV1Api);
     this.appsV1Api = this.kubeConfig.makeApiClient(AppsV1Api);
-    
   }
 
   async createNamespace(namespaceName: string): Promise<void> {
@@ -59,9 +60,14 @@ export class KubernetesService {
     }
   }
 
-  async runKubectlCommand(namespace: string, podName: string, command: string, containerName: string = 'wordpress',) {
+  async runKubectlCommand(
+    namespace: string,
+    podName: string,
+    command: string,
+    containerName: string = 'wordpress',
+  ) {
     const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -c ${containerName} -- ${command}`;
-    
+
     try {
       const { stdout, stderr } = await execAsync(kubectlCommand);
       if (stderr) {
@@ -332,15 +338,18 @@ export class KubernetesService {
     namespace: string,
   ): Promise<string> {
     try {
-      console.log(`Fetching details for phpMyAdmin service with instanceId: ${instanceId} in namespace: ${namespace}`);
-      const phpMyAdminServiceResponse = await this.coreApi.readNamespacedService(
-        `phpadmin-${instanceId}`,
-        namespace,
+      console.log(
+        `Fetching details for phpMyAdmin service with instanceId: ${instanceId} in namespace: ${namespace}`,
       );
+      const phpMyAdminServiceResponse =
+        await this.coreApi.readNamespacedService(
+          `phpadmin-${instanceId}`,
+          namespace,
+        );
       const phpMyAdminService = phpMyAdminServiceResponse.body;
 
       const phpMyAdminNodePort = phpMyAdminService.spec.ports.find(
-        (port) => port.port === 8080, 
+        (port) => port.port === 8080,
       )?.nodePort;
 
       if (!phpMyAdminNodePort) {
@@ -349,7 +358,7 @@ export class KubernetesService {
       }
 
       console.log(`NodePort for phpMyAdmin service: ${phpMyAdminNodePort}`);
-      return phpMyAdminNodePort.toString(); 
+      return phpMyAdminNodePort.toString();
     } catch (error) {
       console.error(`Error fetching NodePort for phpMyAdmin: ${error.message}`);
       throw error;
@@ -375,9 +384,9 @@ export class KubernetesService {
   async runWpCliCommand(command: string): Promise<string> {
     try {
       // Assuming you have the pod name and container name
-      const podName = 'your-wordpress-pod-name';  // Replace with your actual pod name
-      const containerName = 'your-wordpress-container-name';  // Replace with your actual container name
-      
+      const podName = 'your-wordpress-pod-name'; // Replace with your actual pod name
+      const containerName = 'your-wordpress-container-name'; // Replace with your actual container name
+
       // Formulate the kubectl exec command to run WP-CLI inside the container
       const kubectlCommand = `kubectl exec ${podName} -c ${containerName} -- wp ${command}`;
 
@@ -392,7 +401,7 @@ export class KubernetesService {
 
       // Log the successful output
       this.logger.log(`WP-CLI command executed successfully: ${stdout}`);
-      
+
       return stdout;
     } catch (error) {
       this.logger.error(`Failed to run WP-CLI command: ${error.message}`);
@@ -405,59 +414,61 @@ export class KubernetesService {
     oldUrl: string,
     newUrl: string,
     statusCode: 301 | 302,
-    action: 'add' | 'remove'
+    action: 'add' | 'remove',
   ) {
     try {
       console.log(`Processing setupId: ${setupId}`);
-  
-      const setup = await this.setupRepository.findOne({ where: { id: setupId } });
+
+      const setup = await this.setupRepository.findOne({
+        where: { id: setupId },
+      });
       if (!setup) throw new Error(`Setup with ID ${setupId} not found`);
-  
+
       const instanceId = setup.instanceId;
       const namespace = setup.nameSpace;
-  
+
       // Fetch the existing ConfigMap
       const { body } = await this.coreApi.readNamespacedConfigMap(
         `nginx-config-${instanceId}`,
-        namespace
+        namespace,
       );
-  
+
       if (!body || !body.data || !body.data['default.conf']) {
         throw new Error('Nginx ConfigMap not found or missing default.conf');
       }
-  
+
       let nginxConfig = body.data['default.conf'];
-  
+
       // Construct the redirect rule
       const redirectRule = `
       location = ${oldUrl} {
           return ${statusCode} ${newUrl};
           add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate";
       }`.trim();
-  
+
       if (action === 'remove') {
         console.log(`Removing redirect rule for URL: ${oldUrl}`);
         const ruleRegex = new RegExp(
           `\\s*location\\s*=\\s*${oldUrl}\\s*{[^}]*}\\s*`,
-          'g'
+          'g',
         );
         nginxConfig = nginxConfig.replace(ruleRegex, '').trim();
       }
-  
+
       if (action === 'add') {
         console.log(`Adding redirect rule: ${oldUrl} -> ${newUrl}`);
         const serverBlockRegex = /server\s*{([\s\S]*?)}/;
         const match = nginxConfig.match(serverBlockRegex);
-  
+
         if (match) {
           const serverContent = match[1].trim();
-  
+
           // Ensure the rule is not already present
           if (!serverContent.includes(`location = ${oldUrl}`)) {
             const updatedServerContent = `${serverContent}\n\n${redirectRule}`;
             nginxConfig = nginxConfig.replace(
               serverBlockRegex,
-              `server {\n${updatedServerContent}\n}`
+              `server {\n${updatedServerContent}\n}`,
             );
           } else {
             console.log(`Redirect rule for ${oldUrl} already exists.`);
@@ -466,7 +477,7 @@ export class KubernetesService {
           throw new Error('No valid server block found in the configuration.');
         }
       }
-  
+
       // Save the redirect to the database
       if (action === 'add') {
         await this.redirectRepository.save({
@@ -480,7 +491,7 @@ export class KubernetesService {
       } else if (action === 'remove') {
         await this.redirectRepository.delete({ setupId, oldUrl });
       }
-  
+
       // Prepare the updated ConfigMap
       const updatedConfigMapManifest = {
         apiVersion: 'v1',
@@ -493,24 +504,244 @@ export class KubernetesService {
           'default.conf': nginxConfig,
         },
       };
-  
+
       // Update ConfigMap
-      await this.coreApi.deleteNamespacedConfigMap(`nginx-config-${instanceId}`, namespace);
+      await this.coreApi.deleteNamespacedConfigMap(
+        `nginx-config-${instanceId}`,
+        namespace,
+      );
       await this.applyManifest(namespace, updatedConfigMapManifest);
-  
+
       // Validate and reload Nginx
       console.log('Validating updated Nginx configuration...');
       await new Promise((resolve) => setTimeout(resolve, 45000));
-      await this.runKubectlCommand(namespace, setup.podName, 'nginx -t', 'nginx');
-  
+      await this.runKubectlCommand(
+        namespace,
+        setup.podName,
+        'nginx -t',
+        'nginx',
+      );
+
       console.log('Reloading Nginx...');
-      await this.runKubectlCommand(namespace, setup.podName, 'nginx -s reload', 'nginx');
-  
-      console.log(`Redirect rule ${action}ed successfully: ${oldUrl} -> ${newUrl}`);
+      await this.runKubectlCommand(
+        namespace,
+        setup.podName,
+        'nginx -s reload',
+        'nginx',
+      );
+
+      console.log(
+        `Redirect rule ${action}ed successfully: ${oldUrl} -> ${newUrl}`,
+      );
     } catch (error) {
       console.error(`Error updating redirect: ${error.message}`);
       throw error;
     }
   }
-  
+
+  async updatePhpFpmVersion(
+    setupId: number,
+    newVersion: string,
+  ): Promise<void> {
+    const setup = await this.setupRepository.findOne({
+      where: { id: setupId },
+    });
+    const deploymentName = setup.wpDeployment;
+    const namespace = setup.nameSpace;
+    const instanceId = setup.instanceId;
+
+    try {
+      // Fetch the existing deployment
+      const { body: deployment } =
+        await this.appsV1Api.readNamespacedDeployment(
+          deploymentName,
+          namespace,
+        );
+
+      // Update the image version for the WordPress container
+      const containers = deployment.spec.template.spec.containers;
+      const wordpressContainer = containers.find(
+        (container) => container.name === 'wordpress',
+      );
+
+      if (!wordpressContainer) {
+        throw new Error(
+          `WordPress container not found in deployment "${deploymentName}"`,
+        );
+      }
+
+      wordpressContainer.image = `wordpress:php${newVersion}-fpm`; // Update the image version
+
+      // Apply the updated deployment
+      await this.appsV1Api.replaceNamespacedDeployment(
+        deploymentName,
+        namespace,
+        deployment,
+      );
+      this.logger.log(
+        `PHP-FPM version updated to "${newVersion}" for deployment "${deploymentName}"`,
+      );
+
+      // Optionally, wait for rollout to complete
+      await this.waitForDeploymentRollout(namespace, deploymentName);
+      this.logger.log(
+        `Deployment "${deploymentName}" successfully rolled out with PHP-FPM version "${newVersion}"`,
+      );
+
+      // After the deployment is updated, find the new WordPress pod
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const newPodName = await this.findNewWordPressPod(namespace, instanceId);
+
+      await this.runKubectlCommand(namespace, newPodName, 'apt-get update');
+      await this.runKubectlCommand(
+        namespace,
+        newPodName,
+        'apt-get install -y curl',
+      );
+      await this.runKubectlCommand(
+        namespace,
+        newPodName,
+        'curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar',
+      );
+      await this.runKubectlCommand(
+        namespace,
+        newPodName,
+        'chmod +x wp-cli.phar',
+      );
+      await this.runKubectlCommand(
+        namespace,
+        newPodName,
+        'mv wp-cli.phar /usr/local/bin/wp',
+      );
+
+      // Save the new pod name to the database
+      setup.podName = newPodName;
+      setup.currentPhpVersion = newVersion;
+      await this.setupRepository.save(setup);
+      this.logger.log(
+        `New pod name "${newPodName}" saved for setup ID: ${setupId}`,
+      );
+    } catch (error) {
+      this.logger.error(`Error updating PHP-FPM version: ${error.message}`);
+      throw error;
+    }
+  }
+
+  private async waitForDeploymentRollout(
+    namespace: string,
+    deploymentName: string,
+  ): Promise<void> {
+    try {
+      this.logger.log(
+        `Waiting for deployment "${deploymentName}" to roll out...`,
+      );
+      const command = `kubectl rollout status deployment/${deploymentName} -n ${namespace}`;
+      const { stdout, stderr } = await execAsync(command);
+
+      if (stderr) {
+        throw new Error(`Rollout status command error: ${stderr}`);
+      }
+      this.logger.log(stdout);
+    } catch (error) {
+      this.logger.error(
+        `Error waiting for deployment rollout: ${error.message}`,
+      );
+      throw error;
+    }
+  }
+
+  // Method to find the new WordPress pod by its deployment
+  private async findNewWordPressPod(
+    namespace: string,
+    instanceId: string,
+  ): Promise<string> {
+    try {
+      // Build the kubectl command to get pods with the app label that matches the instanceId
+      const command = `kubectl get pods -n ${namespace} -l app=wordpress-${instanceId} -o jsonpath='{.items[*].metadata.name}'`;
+
+      // Execute the command to get pod names
+      const { stdout, stderr } = await execAsync(command);
+
+      if (stderr) {
+        throw new Error(`Error executing kubectl command: ${stderr}`);
+      }
+
+      // Remove quotes and clean the result
+      const podNames = stdout
+        .replace(/'/g, '')
+        .trim()
+        .split(' ')
+        .filter((name) => name); // Remove all single quotes
+
+      if (podNames.length === 0) {
+        throw new Error(`No new WordPress pod found after deployment update.`);
+      }
+
+      // Return the first pod name (you can modify this logic if you need the latest pod)
+      return podNames[0];
+    } catch (error) {
+      this.logger.error(`Error finding new WordPress pod: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async restartPhpEngine(setupId: number): Promise<void> {
+    const setup = await this.setupRepository.findOne({
+      where: { id: setupId },
+    });
+    const deploymentName = setup.wpDeployment;
+    const namespace = setup.nameSpace;
+    const instanceId = setup.instanceId;
+
+    try {
+      // Use kubectl to restart the deployment
+      const restartCommand = `kubectl rollout restart deployment/${deploymentName} -n ${namespace}`;
+      const { stdout, stderr } = await execAsync(restartCommand);
+
+      if (stderr) {
+        throw new Error(`Error restarting deployment: ${stderr}`);
+      }
+      this.logger.log(`Deployment "${deploymentName}" restarted: ${stdout}`);
+
+      // Wait for the rollout to complete
+      await this.waitForDeploymentRollout(namespace, deploymentName);
+      this.logger.log(`Deployment "${deploymentName}" successfully restarted.`);
+
+      // Find the new WordPress pod
+      await new Promise((resolve) => setTimeout(resolve, 3000)); // Short delay to allow pod initialization
+      const newPodName = await this.findNewWordPressPod(namespace, instanceId);
+
+      await this.runKubectlCommand(namespace, newPodName, 'apt-get update');
+      await this.runKubectlCommand(
+        namespace,
+        newPodName,
+        'apt-get install -y curl',
+      );
+      await this.runKubectlCommand(
+        namespace,
+        newPodName,
+        'curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar',
+      );
+      await this.runKubectlCommand(
+        namespace,
+        newPodName,
+        'chmod +x wp-cli.phar',
+      );
+      await this.runKubectlCommand(
+        namespace,
+        newPodName,
+        'mv wp-cli.phar /usr/local/bin/wp',
+      );
+
+      // Save the new pod name to the database
+      setup.podName = newPodName;
+      await this.setupRepository.save(setup);
+      this.logger.log(
+        `New pod name "${newPodName}" saved for setup ID: ${setupId}`,
+      );
+    } catch (error) {
+      this.logger.error(`Error restarting PHP engine: ${error.message}`);
+      throw error;
+    }
+  }
 }

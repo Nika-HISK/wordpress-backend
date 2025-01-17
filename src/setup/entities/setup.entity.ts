@@ -46,7 +46,7 @@ export class Setup extends baseEntity {
   wpReplicaSet: string;
 
   @Column()
-  instanceId: string
+  instanceId: string;
 
   @Column()
   sqlReplicaSet: string;
@@ -61,10 +61,13 @@ export class Setup extends baseEntity {
   wpfullIp: string;
 
   @Column()
-  phpAdminFullIp: string
+  phpAdminFullIp: string;
 
   @Column()
   mysqlPassword: string;
+
+  @Column({ default: '8.2' })
+  currentPhpVersion: string;
 
   @ManyToOne(() => User, (user) => user.setup)
   @JoinColumn({ name: 'userId' })
@@ -83,7 +86,7 @@ export class Setup extends baseEntity {
   wpUsers: WpUser[];
 
   @OneToMany(() => Backup, (backups) => backups.setup)
-  backups: Backup[]
+  backups: Backup[];
 
   @OneToMany(() => Redirect, (redirect) => redirect.setup)
   redirects: Redirect[];
