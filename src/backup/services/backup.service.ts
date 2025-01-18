@@ -251,7 +251,6 @@ async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
         const s3SqlDestinationPath = `s3://${s3Bucket}/${dbInPod.name}`;
 
         try {
-          // Ensure required tools are available
           console.log('Installing required tools in pod...');
           await this.setupService.runKubectlCommand(
             setup.nameSpace,
@@ -265,7 +264,6 @@ async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
             '/usr/bin/apt-get install -y s3cmd zip -qq'
           );
 
-          // Upload the SQL dump to S3
           console.log(`Uploading ${sqlFilePath} to S3 at ${s3SqlDestinationPath}...`);
           const s3SqlCmdCommand = `s3cmd put ${sqlFilePath} ${s3SqlDestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
           await this.setupService.runKubectlCommand(
@@ -274,12 +272,10 @@ async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
             s3SqlCmdCommand
           );
 
-          // Generate presigned URL
           console.log('Generating presigned URL for database...');
           const presignedUrl = await this.s3Service.getPresignedUrl(dbInPod.name);
           console.log('Presigned URL:', presignedUrl);
 
-          // Save backup details
           await this.backupRepository.createManualS3Backup(
             dbInPod.name,
             setupId,
