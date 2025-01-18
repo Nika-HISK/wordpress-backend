@@ -81,7 +81,6 @@ export class BackupService {
       console.error('Command error:', error);
     }
 
-    // backupName: string, setupId: number, instanceId: string, s3ZippedUrl: string, backupType: string, whereGo: string, createBackupDto: CreateBackupDto, s3SqlUrl: string
 
 
 
@@ -92,69 +91,214 @@ export class BackupService {
     };
 }
 
-  
-  async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
-    const backup = await this.createManualBackupToPodForCreateS3(setupId);
-    const setup = await this.setupService.findOne(backup.setupId);
-    const backupFilePath = `/backups/${backup.name}`;
-    const sqlFilePath = `/backups/${backup.name.replace('.zip', '.sql')}`
-  
-    const s3Bucket = createS3BackupDto.bucket;
-    const s3DestinationPath = `s3://${s3Bucket}/${backup.name}`;
-    const s3SqlDestinationPath = `s3://${s3Bucket}/${backup.name.replace('.zip', '.sql')}`  
-  
-    await this.setupService.runKubectlCommand(
+
+async createOnlyFilesForS3(setupId: number) {
+  const setup = await this.setupService.findOne(setupId);
+  const instanceId = crypto.randomBytes(4).toString('hex');
+
+  const zipFileName = `${setup.siteName}-${instanceId}.zip`;
+
+
+  try {
+      await this.setupService.runKubectlCommand(
       setup.nameSpace,
       setup.podName,
-      '/usr/bin/apt-get update -qq'
+      '/usr/bin/apt-get update -qq', 
+      'wordpress'
     );
   
       await this.setupService.runKubectlCommand(
       setup.nameSpace,
       setup.podName,
-      '/usr/bin/apt-get install -y s3cmd zip -qq'
+      '/usr/bin/apt-get install -y mariadb-client zip -qq'
     );
   
-      const s3CmdCommand = `s3cmd put ${backupFilePath} ${s3DestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
-      const s3SqlCmdCommand = `s3cmd put ${sqlFilePath} ${s3SqlDestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
- 
-      try {
-         
-    await this.setupService.runKubectlCommand(
+     await this.setupService.runKubectlCommand(
       setup.nameSpace,
       setup.podName,
-      s3CmdCommand
+      'mkdir -p /backups',
+      'wordpress'
     );
+  
+     await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      `zip -r /backups/${zipFileName} .`,
+      'wordpress'
+    );
+  } catch (error) {
+    console.error('Command error:', error);
+  }
 
-    await this.setupService.runKubectlCommand(
+
+
+
+  return {
+    name: zipFileName,
+    setupId: setupId,
+    instanceId: instanceId
+  };
+}
+
+async createOnlyDbForS3(setupId: number) {
+  const setup = await this.setupService.findOne(setupId);
+  const instanceId = crypto.randomBytes(4).toString('hex');
+
+  const sqlFileName = `${setup.siteName}-${instanceId}.sql`;
+
+
+  try {
+      await this.setupService.runKubectlCommand(
       setup.nameSpace,
       setup.podName,
-      s3SqlCmdCommand
+      '/usr/bin/apt-get update -qq', 
+      'wordpress'
     );
-      } catch(error) {
-        throw new HttpException('bucket accessKey or accessSecretKey is incorrect', HttpStatus.BAD_REQUEST)
+  
+      await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      '/usr/bin/apt-get install -y mariadb-client zip -qq'
+    );
+  
+     await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      'mkdir -p /backups',
+      'wordpress'
+    );
+  
+     await this.setupService.runKubectlCommand(
+      setup.nameSpace,
+      setup.podName,
+      `wp db export /backups/${sqlFileName} --allow-root`,
+      'wordpress'
+    );
+  
+  } catch (error) {
+    console.error('Command error:', error);
+  }
+
+
+  return {
+    name: sqlFileName,
+    setupId: setupId,
+    instanceId: instanceId
+  };
+}
+  
+async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
+  const uploadFrequency = createS3BackupDto.uploadFrequency;
+  const interval = uploadFrequency === 'weekly' ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+
+  if (uploadFrequency === 'weekly' || uploadFrequency === 'monthly') {
+    setInterval(async () => {
+      if (createS3BackupDto.files) {
+        console.log('Starting file backup to S3...');
+        const filesInPod = await this.createOnlyFilesForS3(setupId);
+        const setup = await this.setupService.findOne(filesInPod.setupId);
+        const backupFilePath = `/backups/${filesInPod.name}`;
+        const s3Bucket = createS3BackupDto.bucket;
+        const s3DestinationPath = `s3://${s3Bucket}/${filesInPod.name}`;
+
+        try {
+          console.log('Installing required tools in pod...');
+          await this.setupService.runKubectlCommand(
+            setup.nameSpace,
+            setup.podName,
+            '/usr/bin/apt-get update -qq'
+          );
+
+          await this.setupService.runKubectlCommand(
+            setup.nameSpace,
+            setup.podName,
+            '/usr/bin/apt-get install -y s3cmd zip -qq'
+          );
+
+          console.log(`Uploading ${backupFilePath} to S3 at ${s3DestinationPath}...`);
+          const s3CmdCommand = `s3cmd put ${backupFilePath} ${s3DestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
+          await this.setupService.runKubectlCommand(
+            setup.nameSpace,
+            setup.podName,
+            s3CmdCommand
+          );
+
+          console.log('Generating presigned URL for file...');
+          const presignedUrl = await this.s3Service.getPresignedUrl(filesInPod.name);
+          console.log('Presigned URL:', presignedUrl);
+
+          await this.backupRepository.createManualS3Backup(
+            filesInPod.name,
+            setupId,
+            filesInPod.instanceId,
+            presignedUrl,
+            'manual',
+            'pod',
+            createS3BackupDto,
+            'sqlPresignedUrl'
+          );
+        } catch (error) {
+          console.error('Error during file backup to S3:', error);
+        }
       }
 
-    const backupType = 'manual'
-    const whereGo = 'pod';
-  
-    const presignedUrl = await this.s3Service.getPresignedUrl(backup.name);
-    const sqlPresignedUrl = await this.s3Service.getPresignedUrl(backup.name.replace('.zip', '.sql'))
+      if (createS3BackupDto.database) {
+        console.log('Starting database backup to S3...');
+        const dbInPod = await this.createOnlyDbForS3(setupId);
+        const setup = await this.setupService.findOne(dbInPod.setupId);
+        const sqlFilePath = `/backups/${dbInPod.name}`;
+        const s3Bucket = createS3BackupDto.bucket;
+        const s3SqlDestinationPath = `s3://${s3Bucket}/${dbInPod.name}`;
 
+        try {
+          // Ensure required tools are available
+          console.log('Installing required tools in pod...');
+          await this.setupService.runKubectlCommand(
+            setup.nameSpace,
+            setup.podName,
+            '/usr/bin/apt-get update -qq'
+          );
 
+          await this.setupService.runKubectlCommand(
+            setup.nameSpace,
+            setup.podName,
+            '/usr/bin/apt-get install -y s3cmd zip -qq'
+          );
 
-    const finallBackup = await this.backupRepository.createManualS3Backup(
-      backup.name,
-      setupId,
-      backup.instanceId,
-      presignedUrl,
-      backupType,
-      whereGo,
-      createS3BackupDto,
-      sqlPresignedUrl
-  );
-    return finallBackup;
+          // Upload the SQL dump to S3
+          console.log(`Uploading ${sqlFilePath} to S3 at ${s3SqlDestinationPath}...`);
+          const s3SqlCmdCommand = `s3cmd put ${sqlFilePath} ${s3SqlDestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
+          await this.setupService.runKubectlCommand(
+            setup.nameSpace,
+            setup.podName,
+            s3SqlCmdCommand
+          );
+
+          // Generate presigned URL
+          console.log('Generating presigned URL for database...');
+          const presignedUrl = await this.s3Service.getPresignedUrl(dbInPod.name);
+          console.log('Presigned URL:', presignedUrl);
+
+          // Save backup details
+          await this.backupRepository.createManualS3Backup(
+            dbInPod.name,
+            setupId,
+            dbInPod.instanceId,
+            presignedUrl,
+            'manual',
+            'pod',
+            createS3BackupDto,
+            presignedUrl
+          );
+        } catch (error) {
+          console.error('Error during database backup to S3:', error);
+        }
+      }
+    }, interval);
   }
+}
+
+
   
 
 
