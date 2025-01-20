@@ -21,7 +21,7 @@ export class BackupRepository {
     private readonly setupService: SetupService
   ) {}
 
-  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3ZippedUrl: string, backupType: string, whereGo: string, createS3BackupDto: CreateS3BackupDto, s3SqlUrl: string) {
+  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3ZippedUrl: string, backupType: string, whereGo: string, createS3BackupDto: CreateS3BackupDto, s3SqlUrl: string, formatedCreatedAt: string, status: string) {
 
   const newBackup = new Backup()
   newBackup.name = backupName
@@ -34,17 +34,50 @@ export class BackupRepository {
   newBackup.bucket = createS3BackupDto.bucket
   newBackup.accessKey = createS3BackupDto.accessKey
   newBackup.accessSecretKey = createS3BackupDto.accessSecretKey
-  // newBackup.uploadFrequency = createS3BackupDto.uploadFrequency
-  // newBackup.database = createS3BackupDto.database
-  // newBackup.files = createS3BackupDto.files
-  // newBackup.formatedCreatedAt = formatedCreatedAt
-  // newBackup.willBeCreatedAt = willBeCreatedAt
-
+  newBackup.uploadFrequency = createS3BackupDto.uploadFrequency
+  newBackup.database = createS3BackupDto.database
+  newBackup.files = createS3BackupDto.files
+  newBackup.formatedCreatedAt = formatedCreatedAt
+  newBackup.status = status
+  
+  
 
   return await this.backupRepository.save(newBackup)
 
   }
 
+
+  async createExternalBackup(setupId: number, backupType: string, whereGo: string, createS3BackupDto: CreateS3BackupDto, willBeCreatedAt: string, status: string) {
+
+    const newBackup = new Backup()
+    newBackup.setupId = setupId
+    newBackup.type = backupType
+    newBackup.whereGo = whereGo
+    newBackup.uploadFrequency = createS3BackupDto.uploadFrequency
+    newBackup.formatedCreatedAt = willBeCreatedAt
+    newBackup.willBeCreatedAt = willBeCreatedAt
+    newBackup.status = status
+  
+  
+    return await this.backupRepository.save(newBackup)
+  
+    }
+
+
+    async findExternalBackups(setupId: number) {
+      return await this.backupRepository
+        .createQueryBuilder('backup')
+        .select([
+          'backup.id',
+          'backup.setupId',
+          'backup.formatedCreatedAt',
+          'backup.willBeCreatedAt',
+          'backup.status',
+        ])
+        .where('backup.type = :type', { type: 'external' })
+        .getMany();
+    }
+    
 
   async createManulToPod(backupName: string, setupId: number, instanceId: string,  backupType: string, whereGo: string, s3ZippedUrl: string) {
     const newDate = new Date();

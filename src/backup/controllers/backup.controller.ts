@@ -16,6 +16,12 @@ export class BackupController {
   }
 
   @Roles(Role.USER)
+  @Post('onlyfiles/:setupId')
+  async createOnlyFiles(@Param('setupId') setupId:string) {
+    return await this.backupService.createOnlyFilesForS3(Number(setupId))
+  }
+
+  @Roles(Role.USER)
   @Post('restorefroms3/:backupId')
   async restoreBackupFromS3(@Param('backupId') backupId:string) {
     return await this.backupService.restoreBackupFromS3(Number(backupId))
@@ -109,6 +115,11 @@ export class BackupController {
     return await this.backupService.findSixHourlyBackups()
   }
 
+  @Roles(Role.USER)
+  @Get('external/:setupId')
+  async findExternalBackups(@Param('setupId') setupId:string) {
+    return await this.backupService.findExternalBackups(Number(setupId))
+  }
 
   @Roles(Role.USER)
   @Get('manuallimit/:setupId')

@@ -6,13 +6,13 @@ import { Entity, Column, ManyToOne } from 'typeorm';
 @Entity()
 export class Backup extends baseEntity {
 
-  @Column()
+  @Column({nullable: true})
   name: string;
 
   @Column()
   setupId: number;
  
-  @Column()
+  @Column({nullable: true})
   instanceId: string;
 
   @ManyToOne(() => Setup, (setup) => setup.backups)
@@ -25,7 +25,7 @@ export class Backup extends baseEntity {
   s3SqlUrl:string
 
 
-  @Column({type: 'enum', enum:[ 'daily', 'hourly', 'six-hourly', 'manual', 'manualLimited', 'downloadable']})
+  @Column({type: 'enum', enum:[ 'daily', 'hourly', 'six-hourly', 'manual', 'manualLimited', 'downloadable', 'external', 'externalWillbeCreatedAt']})
   type: string
 
   @Column({type: 'enum', enum:['s3', 'pod']})
@@ -64,5 +64,8 @@ export class Backup extends baseEntity {
 
   @Column({nullable: true})
   willBeCreatedAt: string
+
+  @Column({nullable: true, type: 'enum', enum:['willBeCreated', 'done']})
+  status: string
 
 }

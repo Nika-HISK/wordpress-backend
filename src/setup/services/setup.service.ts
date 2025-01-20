@@ -1,4 +1,6 @@
 import {
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -727,7 +729,12 @@ export class SetupService {
   }
 
   async findOne(id: number) {
-    return await this.setupRepository.findOne(id);
+    const setup = await this.setupRepository.findOne(id);
+    if(!setup) {
+      throw new HttpException('Email already in use', HttpStatus.BAD_REQUEST);
+    }
+    return setup
+    
   }
 
   async findByTitle() {
