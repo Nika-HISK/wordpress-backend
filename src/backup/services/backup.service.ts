@@ -12,6 +12,9 @@ import * as os from 'os';
 import { CreateBackupDto } from '../dto/create-backup.dto';
 import { wpcliService } from 'src/wpcli/services/wpcli.service';
 import { CreateS3BackupDto } from '../dto/create-s3Backup.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Setup } from 'src/setup/entities/setup.entity';
+import { Repository } from 'typeorm';
 const dayjs = require('dayjs');
 
 
@@ -22,6 +25,8 @@ const execAsync = promisify(exec);
 @Injectable()
 export class BackupService {
   constructor(
+    @InjectRepository(Setup)
+    private readonly setupRepository: Repository<Setup>,
     private readonly backupRepository: BackupRepository,
     private readonly filesService: FilesService,
     private readonly k8sService: KubernetesService,
@@ -186,178 +191,124 @@ async createOnlyDbForS3(setupId: number) {
 }
   
 async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
-  console.log('heere');
+  console.log('Starting combined backup process...');
 
   const uploadFrequency = createS3BackupDto.uploadFrequency;
   const interval = uploadFrequency === 'weekly' ? 40000 : 60000;
-  
+
   if (uploadFrequency === 'weekly' || uploadFrequency === 'monthly') {
+    const createdAtNow = new Date();
+    let willBeCreatedAt = '';
+    let formatedWillBeCreatedAt = '';
 
-    const createdAtNow = new Date()
-    let willBeCreatedAt = ''
-    let formatedWillBeCreatedAt = ''
-    if(createS3BackupDto.uploadFrequency == 'weekly') {
-
-      willBeCreatedAt = dayjs(createdAtNow).add(7, 'day').toISOString(); 
-       formatedWillBeCreatedAt = dayjs(willBeCreatedAt).format("MMM DD , YYYY , hh : mm A");
-
-    }
-  
-    if(createS3BackupDto.uploadFrequency == 'monthly') {
+    if (createS3BackupDto.uploadFrequency === 'weekly') {
+      willBeCreatedAt = dayjs(createdAtNow).add(7, 'day').toISOString();
+      formatedWillBeCreatedAt = dayjs(willBeCreatedAt).format("MMM DD , YYYY , hh : mm A");
+    } else if (createS3BackupDto.uploadFrequency === 'monthly') {
       willBeCreatedAt = dayjs(createdAtNow).add(1, 'month').toISOString();
       formatedWillBeCreatedAt = dayjs(willBeCreatedAt).format("MMM DD , YYYY , hh : mm A");
     }
 
-    const status = 'willBeCreated'
+    const status = 'willBeCreated';
+    const backupType = 'external';
+    const whereGo = 's3';
+    await this.backupRepository.createExternalBackup(setupId, backupType, whereGo, createS3BackupDto, formatedWillBeCreatedAt, status);
+    const setup = await this.setupService.findOne(setupId);
+
+    setup.disableExternal = false
+
+    await this.setupRepository.save(setup)
   
-    const backupType = 'external'
-    const whereGo = 's3'
-    await this.backupRepository.createExternalBackup(setupId, backupType, whereGo, createS3BackupDto, formatedWillBeCreatedAt, status)
+    const intervalId =  setInterval(async () => {
+      console.log('Creating combined ZIP file for backup...');
+      const combinedinstanceId = crypto.randomBytes(4).toString('hex');
+      const setup = await this.setupService.findOne(setupId);
+      if(setup.disableExternal == true) {
+        console.log('DisableExternal on this setup is true');
+        clearInterval(intervalId); 
+          return {message: 'DisableExternal on this setup is true'}
+      }
+      const combinedZipPath = `/backups/combined_${combinedinstanceId}.zip`;
+
+
+
+      try {
+        const fileBackup = createS3BackupDto.files ? await this.createOnlyFilesForS3(setupId) : null;
+        const dbBackup = createS3BackupDto.database ? await this.createOnlyDbForS3(setupId) : null;
+
+        let zipCommand = `zip -j ${combinedZipPath}`;
+        if (fileBackup) {
+          zipCommand += ` /backups/${fileBackup.name}`;
+        }
+        if (dbBackup) {
+          zipCommand += ` /backups/${dbBackup.name}`;
+        }
+        await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, zipCommand);
+
+        const s3Bucket = createS3BackupDto.bucket;
+        const s3DestinationPath = `s3://${s3Bucket}/combined_${combinedinstanceId}.zip`;
+        const s3CmdCommand = `s3cmd put ${combinedZipPath} ${s3DestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
+        await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, s3CmdCommand);
+
+        const presignedUrl = await this.s3Service.getPresignedUrl(`combined_${combinedinstanceId}.zip`);
+        console.log('Presigned URL:', presignedUrl);
+
+        const createdAt = new Date();
+        const formatedCreatedAt = dayjs(createdAt).format("MMM DD , YYYY , hh : mm A");
+        const status = 'done';
+        await this.backupRepository.createManualS3Backup(
+          `combined_${combinedinstanceId}.zip`,
+          setupId,
+          fileBackup?.instanceId || dbBackup?.instanceId || null,
+          presignedUrl,
+          'external',
+          's3',
+          createS3BackupDto,
+          presignedUrl,
+          formatedCreatedAt,
+          status
+        );
+
+        const createdAtNow = new Date();
+        let willBeCreatedAt = '';
+        let formatedWillBeCreatedAt = '';
     
-     setInterval(async () => {
-
-
-      if (createS3BackupDto.files) {
-        console.log('Starting file backup to S3...');
-        const filesInPod = await this.createOnlyFilesForS3(setupId);
-        console.log('created filesInPod');
-        
-        const setup = await this.setupService.findOne(filesInPod.setupId);
-        const backupFilePath = `/backups/${filesInPod.name}`;
-        const s3Bucket = createS3BackupDto.bucket;
-        const s3DestinationPath = `s3://${s3Bucket}/${filesInPod.name}`;
-        try {
-          console.log('Installing required tools in pod...');
-          await this.setupService.runKubectlCommand(
-            setup.nameSpace,
-            setup.podName,
-            '/usr/bin/apt-get update -qq'
-          );
-
-          await this.setupService.runKubectlCommand(
-            setup.nameSpace,
-            setup.podName,
-            '/usr/bin/apt-get install -y s3cmd zip -qq'
-          );
-
-          console.log(`Uploading ${backupFilePath} to S3 at ${s3DestinationPath}...`);
-          const s3CmdCommand = `s3cmd put ${backupFilePath} ${s3DestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
-          await this.setupService.runKubectlCommand(
-            setup.nameSpace,
-            setup.podName,
-            s3CmdCommand
-          );
-
-          console.log('Generating presigned URL for file...');
-          const presignedUrl = await this.s3Service.getPresignedUrl(filesInPod.name);
-          console.log('Presigned URL:', presignedUrl);
-          const createdAt = new Date()
-          const formatedCreatedAt = dayjs(createdAt).format("MMM DD , YYYY , hh : mm A");
-          const status = 'done'
-
-          await this.backupRepository.createManualS3Backup(
-            filesInPod.name,
-            setupId,
-            filesInPod.instanceId,
-            presignedUrl,
-            'external',
-            'pod',
-            createS3BackupDto,
-            'sqlPresignedUrl',
-            formatedCreatedAt,
-            status
-          );
-        } catch (error) {
-          console.error('Error during file backup to S3:', error);
+        if (createS3BackupDto.uploadFrequency === 'weekly') {
+          willBeCreatedAt = dayjs(createdAtNow).add(7, 'day').toISOString();
+          formatedWillBeCreatedAt = dayjs(willBeCreatedAt).format("MMM DD , YYYY , hh : mm A");
+        } else if (createS3BackupDto.uploadFrequency === 'monthly') {
+          willBeCreatedAt = dayjs(createdAtNow).add(1, 'month').toISOString();
+          formatedWillBeCreatedAt = dayjs(willBeCreatedAt).format("MMM DD , YYYY , hh : mm A");
         }
-      }
+    
+        const statusWillbeCreatedAt = 'willBeCreated';
+        const backupType = 'external';
+        const whereGo = 's3';
+        await this.backupRepository.createExternalBackup(setupId, backupType, whereGo, createS3BackupDto, formatedWillBeCreatedAt, statusWillbeCreatedAt);
+    
 
-      if (createS3BackupDto.database) {
-        console.log('Starting database backup to S3...');
-        const dbInPod = await this.createOnlyDbForS3(setupId);
-        const setup = await this.setupService.findOne(dbInPod.setupId);
-        const sqlFilePath = `/backups/${dbInPod.name}`;
-        const s3Bucket = createS3BackupDto.bucket;
-        const s3SqlDestinationPath = `s3://${s3Bucket}/${dbInPod.name}`;
-
-        try {
-          console.log('Installing required tools in pod...');
-          await this.setupService.runKubectlCommand(
-            setup.nameSpace,
-            setup.podName,
-            '/usr/bin/apt-get update -qq'
-          );
-
-          await this.setupService.runKubectlCommand(
-            setup.nameSpace,
-            setup.podName,
-            '/usr/bin/apt-get install -y s3cmd zip -qq'
-          );
-
-          console.log(`Uploading ${sqlFilePath} to S3 at ${s3SqlDestinationPath}...`);
-          const s3SqlCmdCommand = `s3cmd put ${sqlFilePath} ${s3SqlDestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
-          await this.setupService.runKubectlCommand(
-            setup.nameSpace,
-            setup.podName,
-            s3SqlCmdCommand
-          );
-
-          console.log('Generating presigned URL for database...');
-          const presignedUrl = await this.s3Service.getPresignedUrl(dbInPod.name);
-          console.log('Presigned URL:', presignedUrl);
-
-          const createdAt = new Date()
-          const formatedCreatedAt = dayjs(createdAt).format("MMM DD , YYYY , hh : mm A");
-          const status = 'done'
-
-          await this.backupRepository.createManualS3Backup(
-            dbInPod.name,
-            setupId,
-            dbInPod.instanceId,
-            presignedUrl,
-            'external',
-            'pod',
-            createS3BackupDto,
-            presignedUrl,
-            formatedCreatedAt,
-            status
-          );
-        } catch (error) {
-          console.error('Error during database backup to S3:', error);
-        }
-      }
-
-
-
-const createdAtNow = new Date()
-console.log(createdAtNow, 'avoeeeeeee');
-
-let willBeCreatedAt = ''
-let formatedWillBeCreatedAt = ''
-if(createS3BackupDto.uploadFrequency == 'weekly') {
-  
-  willBeCreatedAt = dayjs(createdAtNow).add(7, 'day').toISOString(); 
-   formatedWillBeCreatedAt = dayjs(willBeCreatedAt).format("MMM DD , YYYY , hh : mm A");
-  
-}
-
-if(createS3BackupDto.uploadFrequency == 'monthly') {
-  willBeCreatedAt = dayjs(createdAtNow).add(1, 'month').toISOString();
-  formatedWillBeCreatedAt = dayjs(willBeCreatedAt).format("MMM DD , YYYY , hh : mm A");
-}
-
-const status = 'willBeCreated'
-
-const backupType = 'external'
-const whereGo = 's3'
-await this.backupRepository.createExternalBackup(setupId, backupType, whereGo, createS3BackupDto, formatedWillBeCreatedAt, status)
-
-
+        console.log('Combined backup successfully uploaded to S3.');
+      } catch (error) {
+        console.error('Error during combined backup creation:', error);
+      };
     }, interval);
   }
 
-  return await this.backupRepository.findExternalBackups(setupId)
+  return await this.backupRepository.findExternalBackups(setupId);
 }
+
+
+
+
+async disableExternalBackups(setupId: number) {
+  const setup = await this.setupService.findOne(setupId)
+
+  setup.disableExternal = true
+  await this.setupRepository.save(setup)
+  await this.backupRepository.deleteByStatus('willBeCreated')
+  return await this.backupRepository.findDoneBackups()
+}
+
 
 
   async findExternalBackups(setupId: number) {

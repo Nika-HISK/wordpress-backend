@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Delete, Get, Put } from '@nestjs/common';
+import { Controller, Post, Body, Param, Delete, Get, Put, Patch } from '@nestjs/common';
 import { BackupService } from '../services/backup.service';
 import { CreateBackupDto } from '../dto/create-backup.dto';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
@@ -82,6 +82,12 @@ export class BackupController {
   async createManualWithLimit(@Param('setupId') setupId:string,  @Body() createBackupDto: CreateBackupDto) {
     const backupType = 'manualLimited' 
     return await this.backupService.createManualWithLimit(Number(setupId), backupType, createBackupDto)
+  }
+
+  @Roles(Role.USER)    
+  @Patch('disableexternals/:setupId')
+  async disableExternalBackups(@Param('setupId') setupId:string) {
+    return await this.backupService.disableExternalBackups(Number(setupId))
   }
 
   @Roles(Role.USER)    

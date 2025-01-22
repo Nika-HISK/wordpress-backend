@@ -731,7 +731,7 @@ export class SetupService {
   async findOne(id: number) {
     const setup = await this.setupRepository.findOne(id);
     if(!setup) {
-      throw new HttpException('Email already in use', HttpStatus.BAD_REQUEST);
+      throw new HttpException('setup not found', HttpStatus.BAD_REQUEST);
     }
     return setup
     

@@ -183,7 +183,15 @@ export class BackupRepository {
       .getMany();
   }
   
+  async findDoneBackups() {
+      return await this.backupRepository.find({
+        where:{status: 'done'}
+      })
+  }
 
+  async deleteByStatus(status: string) {
+    return await this.backupRepository.delete({status: status})
+  }
 
   findManualBackups() {
     return this.backupRepository.find({where: {type: 'manual'}})

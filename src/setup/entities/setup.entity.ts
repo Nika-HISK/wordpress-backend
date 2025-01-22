@@ -74,6 +74,9 @@ export class Setup extends baseEntity {
   @Column({nullable: true})
   lastSearchedLength: number;
 
+  @Column({default: false})
+  disableExternal: boolean
+
   @ManyToOne(() => User, (user) => user.setup)
   @JoinColumn({ name: 'userId' })
   user: User;
