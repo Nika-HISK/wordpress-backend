@@ -194,7 +194,7 @@ async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
   console.log('Starting combined backup process...');
 
   const uploadFrequency = createS3BackupDto.uploadFrequency;
-  const interval = uploadFrequency === 'weekly' ? 40000 : 60000;
+  const interval = uploadFrequency === 'weekly' ? 120000 : 60000;
 
   if (uploadFrequency === 'weekly' || uploadFrequency === 'monthly') {
     const createdAtNow = new Date();
@@ -232,6 +232,7 @@ async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
 
 
 
+
       try {
         const fileBackup = createS3BackupDto.files ? await this.createOnlyFilesForS3(setupId) : null;
         const dbBackup = createS3BackupDto.database ? await this.createOnlyDbForS3(setupId) : null;
@@ -253,6 +254,18 @@ async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
         const presignedUrl = await this.s3Service.getPresignedUrl(`combined_${combinedinstanceId}.zip`);
         console.log('Presigned URL:', presignedUrl);
 
+        const size = await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, `stat -c '%s' /backups/combined_${combinedinstanceId}.zip`)
+        const sizeinMg = Number(size) / 1000000;
+        const formattedSize = sizeinMg.toFixed(1); 
+        let finalSize: string;
+        
+        if (Number(formattedSize) > 1000) {
+          finalSize = `${Number(formattedSize) / 1000}GB`; 
+        } else {
+          finalSize = `${Number(formattedSize)}MB`; 
+        }
+
+
         const createdAt = new Date();
         const formatedCreatedAt = dayjs(createdAt).format("MMM DD , YYYY , hh : mm A");
         const status = 'done';
@@ -266,7 +279,8 @@ async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
           createS3BackupDto,
           presignedUrl,
           formatedCreatedAt,
-          status
+          status,
+          finalSize
         );
 
         const createdAtNow = new Date();
@@ -298,7 +312,9 @@ async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
 }
 
 
-
+async findExternalIsDisabled(setupId: number) {
+  return await this.backupRepository.findExternalIsDisabled(setupId)
+}
 
 async disableExternalBackups(setupId: number) {
   const setup = await this.setupService.findOne(setupId)

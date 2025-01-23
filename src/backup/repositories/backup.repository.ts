@@ -21,7 +21,7 @@ export class BackupRepository {
     private readonly setupService: SetupService
   ) {}
 
-  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3ZippedUrl: string, backupType: string, whereGo: string, createS3BackupDto: CreateS3BackupDto, s3SqlUrl: string, formatedCreatedAt: string, status: string) {
+  async createManualS3Backup(backupName: string, setupId: number, instanceId: string, s3ZippedUrl: string, backupType: string, whereGo: string, createS3BackupDto: CreateS3BackupDto, s3SqlUrl: string, formatedCreatedAt: string, status: string, size: string) {
 
   const newBackup = new Backup()
   newBackup.name = backupName
@@ -39,7 +39,7 @@ export class BackupRepository {
   newBackup.files = createS3BackupDto.files
   newBackup.formatedCreatedAt = formatedCreatedAt
   newBackup.status = status
-  
+  newBackup.size = size
   
 
   return await this.backupRepository.save(newBackup)
@@ -73,8 +73,9 @@ export class BackupRepository {
           'backup.formatedCreatedAt',
           'backup.willBeCreatedAt',
           'backup.status',
+          'backup.size'
         ])
-        .where('backup.type = :type', { type: 'external' })
+        .where('backup.type = :type AND backup.setupId = :setupId', { type: 'external', setupId })
         .getMany();
     }
     
@@ -208,6 +209,11 @@ export class BackupRepository {
   findSixHourlyBackups() {
     return this.backupRepository.find({where: {type: 'six-hourly'}})
 
+  }
+
+  async findExternalIsDisabled(setupId: number) {
+    const setup = await this.setupService.findOne(setupId);
+    return setup.disableExternal; 
   }
 
 

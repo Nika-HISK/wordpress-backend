@@ -109,6 +109,12 @@ export class BackupController {
     return await this.backupService.findDailyBackups()
   }
 
+  @Roles(Role.USER)    
+  @Get('isexternaldisabled/:setupId')
+  async findExternalIsDisabled(@Param('setupId') setupId:string) {
+    return await this.backupService.findExternalIsDisabled(Number(setupId))
+  }
+
   @Roles(Role.USER)
   @Get('hourly')
   async findHourlyBackups() {

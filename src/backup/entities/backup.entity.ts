@@ -68,4 +68,7 @@ export class Backup extends baseEntity {
   @Column({nullable: true, type: 'enum', enum:['willBeCreated', 'done']})
   status: string
 
+
+  @Column({nullable: true})
+  size: string
 }
