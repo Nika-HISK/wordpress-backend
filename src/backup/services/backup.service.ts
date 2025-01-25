@@ -194,7 +194,7 @@ async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
   console.log('Starting combined backup process...');
 
   const uploadFrequency = createS3BackupDto.uploadFrequency;
-  const interval = uploadFrequency === 'weekly' ? 120000 : 60000;
+  const interval = uploadFrequency === 'weekly' ? 30000 : 60000;
 
   if (uploadFrequency === 'weekly' || uploadFrequency === 'monthly') {
     const createdAtNow = new Date();
@@ -246,6 +246,10 @@ async createManualToS3(setupId: number, createS3BackupDto: CreateS3BackupDto) {
         }
         await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, zipCommand);
 
+        await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get update -qq', 'wordpress');
+        await this.setupService.runKubectlCommand(setup.nameSpace, setup.podName, '/usr/bin/apt-get install -y s3cmd zip -qq', 'wordpress');
+      
+ 
         const s3Bucket = createS3BackupDto.bucket;
         const s3DestinationPath = `s3://${s3Bucket}/combined_${combinedinstanceId}.zip`;
         const s3CmdCommand = `s3cmd put ${combinedZipPath} ${s3DestinationPath} --access_key=${createS3BackupDto.accessKey} --secret_key=${createS3BackupDto.accessSecretKey} --region eu-north-1`;
