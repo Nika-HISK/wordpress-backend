@@ -14,6 +14,7 @@ import {
   Patch,
   HttpException,
   HttpStatus,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupService } from '../services/setup.service';
@@ -117,6 +118,24 @@ export class SetupController {
   }
 
   @Roles(Role.USER)
+  @Get('redirect/:setupId')
+  async getRedirect(@Param('setupId', ParseIntPipe) setupId: number) {
+    const redirects = await this.setupService.findBySetupId(setupId);
+
+    if (!redirects || redirects.length === 0) {
+      throw new HttpException(
+        `No redirects found for setupId ${setupId}`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return {
+      setupId,
+      redirects,
+    };
+  }
+
+  @Roles(Role.USER)
   @Post('redirect/:setupId')
   async updateRedirect(
     @Param('setupId') setupId: string,
@@ -126,7 +145,6 @@ export class SetupController {
     const numericSetupId = parseInt(setupId, 10);
 
     try {
-      // Call the service to update the Nginx redirect rules
       await this.k8sService.updateRedirectConfig(
         numericSetupId,
         oldUrl,
@@ -195,10 +213,9 @@ export class SetupController {
         throw new HttpException('Invalid setup ID', HttpStatus.BAD_REQUEST);
       }
 
-      // Call the service to restart the deployment
       await this.k8sService.restartPhpEngine(numericSetupId);
 
-      return { message: `PHP engine restarted`};
+      return { message: `PHP engine restarted` };
     } catch (error) {
       throw new HttpException(
         `Failed to restart PHP engine: ${error.message}`,

@@ -11,9 +11,6 @@ import {
 } from '@kubernetes/client-node';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
-import { SetupRepository } from '../repositories/setup.repository';
-import { RedirectRepository } from '../repositories/redirect.repository';
-import { SetupService } from './setup.service';
 import { Repository } from 'typeorm';
 import { Setup } from '../entities/setup.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -142,7 +139,6 @@ export class KubernetesService {
     }
   }
 
-  // Adding the getPod method to fetch pod details
   async getPod(namespace: string, podName: string): Promise<any> {
     try {
       const { body } = await this.coreApi.readNamespacedPod(podName, namespace);
@@ -219,18 +215,16 @@ export class KubernetesService {
           }
         : null;
 
-      // Dynamically adjust bandwidth (add 10MB for testing)
       if (bandwidth) {
-        bandwidth.receive.bytes += 10 * 1024 * 1024; // Add 10 MB to receive bytes
-        bandwidth.transmit.bytes += 10 * 1024 * 1024; // Add 10 MB to transmit bytes
+        bandwidth.receive.bytes += 10 * 1024 * 1024;
+        bandwidth.transmit.bytes += 10 * 1024 * 1024;
       }
 
       const totalBandwidthBytes =
         (bandwidth?.receive.bytes || 0) + (bandwidth?.transmit.bytes || 0);
-      const totalBandwidthMB = Math.round(totalBandwidthBytes / (1024 * 1024)); // Convert bytes to MB
+      const totalBandwidthMB = Math.round(totalBandwidthBytes / (1024 * 1024));
 
-      // Parse disk usage
-      const diskUsageLines = diskUsage.split('\n').slice(1); // Skip header line
+      const diskUsageLines = diskUsage.split('\n').slice(1);
       const diskUsageFormatted = diskUsageLines
         .filter((line) => line.trim())
         .map((line) => {
@@ -245,16 +239,14 @@ export class KubernetesService {
           };
         });
 
-      // Sum up disk usage across all filesystems
       let totalDiskUsedInMB = 0;
 
       diskUsageFormatted.forEach((disk) => {
         const used = disk.used.toUpperCase();
         let usedValue = 0;
 
-        // Handle different units (GB, MB, etc.)
         if (used.includes('G')) {
-          usedValue = parseFloat(used.replace('G', '')) * 1024; // Convert GB to MB
+          usedValue = parseFloat(used.replace('G', '')) * 1024;
         } else if (used.includes('M')) {
           usedValue = parseFloat(used.replace('M', ''));
         }
@@ -262,12 +254,11 @@ export class KubernetesService {
         totalDiskUsedInMB += usedValue;
       });
 
-      // Optionally, dynamically adjust the total disk usage (e.g., add 1GB for testing)
-      totalDiskUsedInMB += 1024; // Add 1GB (1024MB) for testing
+      totalDiskUsedInMB += 1024;
 
       return {
-        bandwidth: `${totalBandwidthMB} MB`, // Send bandwidth in MB
-        totalDiskUsed: `${totalDiskUsedInMB} MB`, // Send total used disk space in MB
+        bandwidth: `${totalBandwidthMB} MB`,
+        totalDiskUsed: `${totalDiskUsedInMB} MB`,
       };
     } catch (error) {
       this.logger.error(
@@ -294,7 +285,6 @@ export class KubernetesService {
     namespace: string,
   ): Promise<string> {
     try {
-      // Step 1: Get pod details
       console.log(
         `Fetching details for pod: ${podName} in namespace: ${namespace}`,
       );
@@ -309,8 +299,6 @@ export class KubernetesService {
         console.error(`Node name not found for pod ${podName}`);
         throw new Error(`Node name not found for pod ${podName}`);
       }
-
-      // Step 2: Get node details
       console.log(`Fetching details for node: ${nodeName}`);
       const nodeResponse = await this.coreApi.readNode(nodeName);
       const node = nodeResponse.body;
@@ -383,23 +371,18 @@ export class KubernetesService {
 
   async runWpCliCommand(command: string): Promise<string> {
     try {
-      // Assuming you have the pod name and container name
-      const podName = 'your-wordpress-pod-name'; // Replace with your actual pod name
-      const containerName = 'your-wordpress-container-name'; // Replace with your actual container name
+      const podName = 'your-wordpress-pod-name';
+      const containerName = 'your-wordpress-container-name';
 
-      // Formulate the kubectl exec command to run WP-CLI inside the container
       const kubectlCommand = `kubectl exec ${podName} -c ${containerName} -- wp ${command}`;
 
-      // Execute the command
       const { stdout, stderr } = await execAsync(kubectlCommand);
 
-      // Check if there was an error in the command
       if (stderr) {
         this.logger.error(`Error running WP-CLI command: ${stderr}`);
         throw new Error(`Error running WP-CLI command: ${stderr}`);
       }
 
-      // Log the successful output
       this.logger.log(`WP-CLI command executed successfully: ${stdout}`);
 
       return stdout;
@@ -427,7 +410,6 @@ export class KubernetesService {
       const instanceId = setup.instanceId;
       const namespace = setup.nameSpace;
 
-      // Fetch the existing ConfigMap
       const { body } = await this.coreApi.readNamespacedConfigMap(
         `nginx-config-${instanceId}`,
         namespace,
@@ -439,7 +421,6 @@ export class KubernetesService {
 
       let nginxConfig = body.data['default.conf'];
 
-      // Construct the redirect rule
       const redirectRule = `
       location = ${oldUrl} {
           return ${statusCode} ${newUrl};
@@ -463,7 +444,6 @@ export class KubernetesService {
         if (match) {
           const serverContent = match[1].trim();
 
-          // Ensure the rule is not already present
           if (!serverContent.includes(`location = ${oldUrl}`)) {
             const updatedServerContent = `${serverContent}\n\n${redirectRule}`;
             nginxConfig = nginxConfig.replace(
@@ -478,7 +458,6 @@ export class KubernetesService {
         }
       }
 
-      // Save the redirect to the database
       if (action === 'add') {
         await this.redirectRepository.save({
           setupId,
@@ -492,7 +471,6 @@ export class KubernetesService {
         await this.redirectRepository.delete({ setupId, oldUrl });
       }
 
-      // Prepare the updated ConfigMap
       const updatedConfigMapManifest = {
         apiVersion: 'v1',
         kind: 'ConfigMap',
@@ -505,14 +483,12 @@ export class KubernetesService {
         },
       };
 
-      // Update ConfigMap
       await this.coreApi.deleteNamespacedConfigMap(
         `nginx-config-${instanceId}`,
         namespace,
       );
       await this.applyManifest(namespace, updatedConfigMapManifest);
 
-      // Validate and reload Nginx
       console.log('Validating updated Nginx configuration...');
       await new Promise((resolve) => setTimeout(resolve, 45000));
       await this.runKubectlCommand(
@@ -551,14 +527,12 @@ export class KubernetesService {
     const instanceId = setup.instanceId;
 
     try {
-      // Fetch the existing deployment
       const { body: deployment } =
         await this.appsV1Api.readNamespacedDeployment(
           deploymentName,
           namespace,
         );
 
-      // Update the image version for the WordPress container
       const containers = deployment.spec.template.spec.containers;
       const wordpressContainer = containers.find(
         (container) => container.name === 'wordpress',
@@ -570,9 +544,8 @@ export class KubernetesService {
         );
       }
 
-      wordpressContainer.image = `wordpress:php${newVersion}-fpm`; // Update the image version
+      wordpressContainer.image = `wordpress:php${newVersion}-fpm`;
 
-      // Apply the updated deployment
       await this.appsV1Api.replaceNamespacedDeployment(
         deploymentName,
         namespace,
@@ -582,13 +555,11 @@ export class KubernetesService {
         `PHP-FPM version updated to "${newVersion}" for deployment "${deploymentName}"`,
       );
 
-      // Optionally, wait for rollout to complete
       await this.waitForDeploymentRollout(namespace, deploymentName);
       this.logger.log(
         `Deployment "${deploymentName}" successfully rolled out with PHP-FPM version "${newVersion}"`,
       );
 
-      // After the deployment is updated, find the new WordPress pod
       await new Promise((resolve) => setTimeout(resolve, 3000));
       const newPodName = await this.findNewWordPressPod(namespace, instanceId);
 
@@ -614,7 +585,6 @@ export class KubernetesService {
         'mv wp-cli.phar /usr/local/bin/wp',
       );
 
-      // Save the new pod name to the database
       setup.podName = newPodName;
       setup.currentPhpVersion = newVersion;
       await this.setupRepository.save(setup);
@@ -650,34 +620,29 @@ export class KubernetesService {
     }
   }
 
-  // Method to find the new WordPress pod by its deployment
   private async findNewWordPressPod(
     namespace: string,
     instanceId: string,
   ): Promise<string> {
     try {
-      // Build the kubectl command to get pods with the app label that matches the instanceId
       const command = `kubectl get pods -n ${namespace} -l app=wordpress-${instanceId} -o jsonpath='{.items[*].metadata.name}'`;
 
-      // Execute the command to get pod names
       const { stdout, stderr } = await execAsync(command);
 
       if (stderr) {
         throw new Error(`Error executing kubectl command: ${stderr}`);
       }
 
-      // Remove quotes and clean the result
       const podNames = stdout
         .replace(/'/g, '')
         .trim()
         .split(' ')
-        .filter((name) => name); // Remove all single quotes
+        .filter((name) => name);
 
       if (podNames.length === 0) {
         throw new Error(`No new WordPress pod found after deployment update.`);
       }
 
-      // Return the first pod name (you can modify this logic if you need the latest pod)
       return podNames[0];
     } catch (error) {
       this.logger.error(`Error finding new WordPress pod: ${error.message}`);
@@ -694,7 +659,6 @@ export class KubernetesService {
     const instanceId = setup.instanceId;
 
     try {
-      // Use kubectl to restart the deployment
       const restartCommand = `kubectl rollout restart deployment/${deploymentName} -n ${namespace}`;
       const { stdout, stderr } = await execAsync(restartCommand);
 
@@ -703,12 +667,10 @@ export class KubernetesService {
       }
       this.logger.log(`Deployment "${deploymentName}" restarted: ${stdout}`);
 
-      // Wait for the rollout to complete
       await this.waitForDeploymentRollout(namespace, deploymentName);
       this.logger.log(`Deployment "${deploymentName}" successfully restarted.`);
 
-      // Find the new WordPress pod
-      await new Promise((resolve) => setTimeout(resolve, 3000)); // Short delay to allow pod initialization
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       const newPodName = await this.findNewWordPressPod(namespace, instanceId);
 
       await this.runKubectlCommand(namespace, newPodName, 'apt-get update');
@@ -733,7 +695,6 @@ export class KubernetesService {
         'mv wp-cli.phar /usr/local/bin/wp',
       );
 
-      // Save the new pod name to the database
       setup.podName = newPodName;
       await this.setupRepository.save(setup);
       this.logger.log(

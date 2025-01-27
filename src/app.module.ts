@@ -16,23 +16,24 @@ import { HelperModule } from './helper/helper.module';
 import { BackupModule } from './backup/backup.module';
 
 @Module({
-  imports: [ThrottlerModule.forRoot([
-    {
-      name: 'short',
-      ttl: 1000,
-      limit: 1,
-    },
-    {
-      name: 'medium',
-      ttl: 10000,
-      limit: 20
-    },
-    {
-      name: 'long',
-      ttl: 60000,
-      limit: 100
-    }
-  ]),
+  imports: [
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000,
+        limit: 1,
+      },
+      {
+        name: 'medium',
+        ttl: 10000,
+        limit: 20,
+      },
+      {
+        name: 'long',
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     ConfigModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'mysql',
@@ -41,7 +42,7 @@ import { BackupModule } from './backup/backup.module';
       username: process.env.DATABASE_USERNAME,
       password: process.env.DATABASE_PASSWORD,
       database: process.env.DATABASE_NAME,
-      autoLoadEntities:true,
+      autoLoadEntities: true,
       synchronize: true,
     }),
     AuthModule,

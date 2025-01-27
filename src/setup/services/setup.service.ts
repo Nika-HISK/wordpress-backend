@@ -5,11 +5,12 @@ import {
 } from '@nestjs/common';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import * as path from 'path';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupRepository } from '../repositories/setup.repository';
 import * as crypto from 'crypto';
 import { KubernetesService } from './kubernetes.service';
+import { RedirectRepository } from '../repositories/redirect.repository';
+import { Redirect } from '../entities/redirect.entity';
 
 const execAsync = promisify(exec);
 
@@ -18,13 +19,17 @@ export class SetupService {
   constructor(
     private readonly setupRepository: SetupRepository,
     private readonly k8sService: KubernetesService,
+    private readonly redirectRepository: RedirectRepository,
   ) {}
 
-
-
-  async runKubectlCommand(namespace: string, podName: string, command: string, containerName: string = 'wordpress',) {
+  async runKubectlCommand(
+    namespace: string,
+    podName: string,
+    command: string,
+    containerName: string = 'wordpress',
+  ) {
     const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -c ${containerName} -- ${command}`;
-    
+
     try {
       const { stdout, stderr } = await execAsync(kubectlCommand);
       if (stderr) {
@@ -39,21 +44,33 @@ export class SetupService {
     }
   }
 
-
-  private async checkAndInstallSed(namespace: string, podName: string, containerName: string): Promise<void> {
-    // Check if sed is installed
+  private async checkAndInstallSed(
+    namespace: string,
+    podName: string,
+    containerName: string,
+  ): Promise<void> {
     const checkCommand = 'which sed';
     try {
-      await this.runKubectlCommand(namespace, podName, checkCommand, containerName);
+      await this.runKubectlCommand(
+        namespace,
+        podName,
+        checkCommand,
+        containerName,
+      );
       console.log('sed is already installed.');
     } catch (error) {
       console.log('sed not found. Installing sed...');
       const installCommand = 'apt-get update && apt-get install -y sed';
-      await this.runKubectlCommand(namespace, podName, installCommand, containerName);
+      await this.runKubectlCommand(
+        namespace,
+        podName,
+        installCommand,
+        containerName,
+      );
       console.log('sed has been installed.');
     }
   }
-  
+
   public async updateNginxErrorLogLevel(
     namespace: string,
     podName: string,
@@ -63,23 +80,31 @@ export class SetupService {
     const configFilePath = '/etc/nginx/nginx.conf';
     const searchPattern = 'error_log  /var/log/nginx/error.log';
     const replacement = `error_log  /var/log/nginx/error.log ${newLogLevel};`;
-  
+
     try {
-      // Check and install sed if missing
       await this.checkAndInstallSed(namespace, podName, containerName);
-  
-      // Update the configuration file using sed (with sh -c for compatibility)
       const sedCommand = `sh -c "sed -i 's|${searchPattern}.*|${replacement}|' ${configFilePath}"`;
-      await this.runKubectlCommand(namespace, podName, sedCommand, containerName);
+      await this.runKubectlCommand(
+        namespace,
+        podName,
+        sedCommand,
+        containerName,
+      );
       console.log(`Updated Nginx error log level to "${newLogLevel}".`);
-  
-      // Reload Nginx to apply changes
+
       const reloadCommand = 'nginx -s reload';
-      await this.runKubectlCommand(namespace, podName, reloadCommand, containerName);
+      await this.runKubectlCommand(
+        namespace,
+        podName,
+        reloadCommand,
+        containerName,
+      );
       console.log('Nginx reloaded successfully.');
     } catch (error) {
       console.error('Failed to update Nginx error log level:', error);
-      throw new InternalServerErrorException('Failed to update Nginx error log level');
+      throw new InternalServerErrorException(
+        'Failed to update Nginx error log level',
+      );
     }
   }
 
@@ -438,10 +463,9 @@ export class SetupService {
           `,
       },
     };
-    
+
     await this.k8sService.applyManifest(namespace, nginxConfigMapManifest);
 
-    // Step 5: Save Pod Name in the Database
     const podName = await this.k8sService.findPodByLabel(
       namespace,
       'unique-id',
@@ -464,10 +488,7 @@ export class SetupService {
     );
     console.log('WP-CLI installed.');
 
-    // Wait for a moment before proceeding
     await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    // Check if wp-config.php exists
 
     console.log('wp-config.php exists. Skipping removal.');
     console.log('wp-config.php does not exist. Proceeding with creation...');
@@ -486,7 +507,6 @@ export class SetupService {
       (port) => port.port === 80,
     )?.nodePort;
 
-    // Install WordPress
     console.log('Installing WordPress...');
     await this.runKubectlCommand(
       namespace,
@@ -494,8 +514,6 @@ export class SetupService {
       `wp core install --url="http://49.12.148.222:${nodePort}" --title="${siteTitle}" --admin_user="${wpAdminUser}" --admin_password="${wpAdminPassword}" --admin_email="${wpAdminEmail}" --skip-email --allow-root`,
     );
     console.log('WordPress installed.');
-
-    // Activate necessary plugins
     console.log('Activating WordPress plugins...');
     await this.runKubectlCommand(
       namespace,
@@ -503,7 +521,6 @@ export class SetupService {
       'wp plugin install wordpress-importer --activate --allow-root',
     );
 
-    // Set file permissions
     console.log('Setting file permissions...');
     try {
       await this.runKubectlCommand(
@@ -566,14 +583,14 @@ export class SetupService {
       mysqlPassword,
       siteName,
       phpAdminFullIp,
-      instanceId
+      instanceId,
     );
 
-    await this.updateNginxErrorLogLevel(namespace, podName, 'debug',);
+    await this.updateNginxErrorLogLevel(namespace, podName, 'debug');
 
     return {
       namespace,
-      wordpressUrl: `http://49.12.148.222:${nodePort}`, // Replace <node-ip> with your cluster's node IP
+      wordpressUrl: `http://49.12.148.222:${nodePort}`,
     };
   }
 
@@ -643,7 +660,6 @@ export class SetupService {
     }
   }
 
-
   async getPodLogFile(
     namespace: string,
     podName: string,
@@ -651,22 +667,30 @@ export class SetupService {
     limit: number = 100,
   ): Promise<string[]> {
     const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -c nginx -- tail -n ${limit} /var/log/nginx/${logFile}`;
-  
+
     try {
       const { stdout, stderr } = await execAsync(kubectlCommand);
       if (stderr) {
-        console.error(`Error fetching log file "${logFile}" from pod "${podName}":`, stderr);
+        console.error(
+          `Error fetching log file "${logFile}" from pod "${podName}":`,
+          stderr,
+        );
       }
-      // Split the logs into an array of strings by line
       return stdout.split('\n').filter((line) => line.trim() !== '');
     } catch (error) {
-      console.error(`Failed to fetch log file "${logFile}" from pod "${podName}":`, error);
+      console.error(
+        `Failed to fetch log file "${logFile}" from pod "${podName}":`,
+        error,
+      );
       throw new InternalServerErrorException(
         `Failed to fetch log file "${logFile}" from pod "${podName}"`,
       );
     }
   }
 
+  async findBySetupId(setupId: number): Promise<Redirect[]> {
+    return this.redirectRepository.findBySetupId(setupId);
+  }
 
   async findAll() {
     return await this.setupRepository.findAll();

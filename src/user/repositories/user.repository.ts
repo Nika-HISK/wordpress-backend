@@ -43,7 +43,6 @@ export class UserRepository {
       throw new NotFoundException(`No setups found for user with ID ${userId}`);
     }
   
-    // Iterate over all setups to update their information
     for (const setup of user.setup) {
       const { podName, nameSpace } = setup;
   

@@ -11,7 +11,9 @@ export class RedirectRepository {
     private readonly redirectRepository: Repository<Redirect>,
   ) {}
 
-  async createRedirect(createRedirectDto: CreateRedirectDto): Promise<Redirect> {
+  async createRedirect(
+    createRedirectDto: CreateRedirectDto,
+  ): Promise<Redirect> {
     const newRedirect = this.redirectRepository.create(createRedirectDto);
     return await this.redirectRepository.save(newRedirect);
   }
@@ -20,13 +22,22 @@ export class RedirectRepository {
     return await this.redirectRepository.find();
   }
 
-  async findBySetupId(setupId: number): Promise<Redirect[]> {
-    const redirects = await this.redirectRepository.find({
-      where: { setupId },
-    });
+  async findBySetupId(setupId: number): Promise<Partial<Redirect[]>> {
+    const redirects = await this.redirectRepository
+      .createQueryBuilder('redirect')
+      .select([
+        'redirect.id',
+        'redirect.oldUrl',
+        'redirect.newUrl',
+        'redirect.statusCode',
+      ])
+      .where('redirect.setupId = :setupId', { setupId })
+      .getMany();
+
     if (!redirects || redirects.length === 0) {
       throw new HttpException(`No redirects found for setupId ${setupId}`, 404);
     }
+
     return redirects;
   }
 
