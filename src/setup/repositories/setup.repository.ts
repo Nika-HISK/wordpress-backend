@@ -97,6 +97,8 @@ export class SetupRepository {
     newSetup.phpAdminFullIp = phpAdminFullIp
     newSetup.instanceId = instanceId
     newSetup.phpDeployment = phpDeployment
+    newSetup.phpAdminFullIp = phpAdminFullIp;
+    newSetup.instanceId = instanceId;
 
     return await this.setupRepository.save(newSetup);
   }

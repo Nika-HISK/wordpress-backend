@@ -5,6 +5,7 @@ import { wpPlugin } from 'src/wpcli/entities/wpPlugin.entity';
 import { wpTheme } from 'src/wpcli/entities/wpTheme.entity';
 import { WpUser } from 'src/wpcli/entities/wpUser.entity';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Redirect } from './redirect.entity';
 
 @Entity()
 export class Setup extends baseEntity {
@@ -45,7 +46,7 @@ export class Setup extends baseEntity {
   wpReplicaSet: string;
 
   @Column()
-  instanceId: string
+  instanceId: string;
 
   @Column()
   sqlReplicaSet: string;
@@ -60,7 +61,7 @@ export class Setup extends baseEntity {
   wpfullIp: string;
 
   @Column()
-  phpAdminFullIp: string
+  phpAdminFullIp: string;
 
   @Column()
   phpDeployment: string
@@ -76,6 +77,8 @@ export class Setup extends baseEntity {
 
   @Column({default: false})
   disableExternal: boolean
+  @Column({ default: '8.2' })
+  currentPhpVersion: string;
 
   @ManyToOne(() => User, (user) => user.setup)
   @JoinColumn({ name: 'userId' })
@@ -94,5 +97,8 @@ export class Setup extends baseEntity {
   wpUsers: WpUser[];
 
   @OneToMany(() => Backup, (backups) => backups.setup)
-  backups: Backup[]
+  backups: Backup[];
+
+  @OneToMany(() => Redirect, (redirect) => redirect.setup)
+  redirects: Redirect[];
 }

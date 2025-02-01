@@ -1,15 +1,9 @@
-import {
-  HttpException,
-  HttpStatus,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Setup } from 'src/setup/entities/setup.entity';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import shellEscape from 'shell-escape';
 import { WpPluginRepository } from '../repositories/wpPlugin.repository';
 import { WpThemeRepository } from '../repositories/wpTheme.repository';
 import { WpUserRepository } from '../repositories/wpUser.repository';
@@ -198,14 +192,17 @@ export class wpcliService {
     return plugins;
   }
 
-  async wpPluginActivate(setupId: number, plugins: string[]): Promise<string[]> {
+  async wpPluginActivate(
+    setupId: number,
+    plugins: string[],
+  ): Promise<string[]> {
     if (!plugins || plugins.length === 0) {
       throw new HttpException(
         'At least one plugin name is required',
         HttpStatus.BAD_REQUEST,
       );
     }
-  
+
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {
       throw new HttpException(
@@ -213,9 +210,9 @@ export class wpcliService {
         HttpStatus.NOT_FOUND,
       );
     }
-  
+
     const results: string[] = [];
-  
+
     for (const plugin of plugins) {
       const command = `wp plugin activate ${plugin} --allow-root`;
       const result = await this.setupService.runKubectlCommand(
@@ -225,41 +222,43 @@ export class wpcliService {
       );
       results.push(result);
     }
-  
+
     return results;
   }
 
-async wpPluginDeactivate(setupId: number, plugins: string[]): Promise<string[]> {
-  if (!plugins || plugins.length === 0) {
-    throw new HttpException(
-      'At least one plugin name is required',
-      HttpStatus.BAD_REQUEST,
-    );
+  async wpPluginDeactivate(
+    setupId: number,
+    plugins: string[],
+  ): Promise<string[]> {
+    if (!plugins || plugins.length === 0) {
+      throw new HttpException(
+        'At least one plugin name is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const setup = await this.setupService.findOne(setupId);
+    if (!setup) {
+      throw new HttpException(
+        `Setup with ID ${setupId} not found`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const results: string[] = [];
+
+    for (const plugin of plugins) {
+      const command = `wp plugin deactivate ${plugin} --allow-root`;
+      const result = await this.setupService.runKubectlCommand(
+        setup.nameSpace,
+        setup.podName,
+        command,
+      );
+      results.push(result);
+    }
+
+    return results;
   }
-
-  const setup = await this.setupService.findOne(setupId);
-  if (!setup) {
-    throw new HttpException(
-      `Setup with ID ${setupId} not found`,
-      HttpStatus.NOT_FOUND,
-    );
-  }
-
-  const results: string[] = [];
-
-  // Loop through plugins and run the command for each one
-  for (const plugin of plugins) {
-    const command = `wp plugin deactivate ${plugin} --allow-root`;
-    const result = await this.setupService.runKubectlCommand(
-      setup.nameSpace,
-      setup.podName,
-      command,
-    );
-    results.push(result);
-  }
-
-  return results;
-}
 
   async wpPluginDelete(setupId: number, plugin: string): Promise<string> {
     if (!plugin) {
@@ -573,7 +572,7 @@ async wpPluginDeactivate(setupId: number, plugins: string[]): Promise<string[]> 
 
   async wpBlogname(setupId: number): Promise<object> {
     const command = 'wp option get blogname --allow-root';
-  
+
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {
       throw new HttpException(
@@ -581,22 +580,21 @@ async wpPluginDeactivate(setupId: number, plugins: string[]): Promise<string[]> 
         HttpStatus.NOT_FOUND,
       );
     }
-  
+
     const output = await this.setupService.runKubectlCommand(
       setup.nameSpace,
       setup.podName,
       command,
     );
     const blogname = { blogname: output.trim() };
-  
+
     return blogname;
   }
 
-
-
   async wpSiteIconUrl(setupId: number): Promise<object> {
-    const command = 'wp eval "echo wp_get_attachment_url(get_option(\'site_icon\'));" --allow-root';
-  
+    const command =
+      'wp eval "echo wp_get_attachment_url(get_option(\'site_icon\'));" --allow-root';
+
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {
       throw new HttpException(
@@ -604,18 +602,14 @@ async wpPluginDeactivate(setupId: number, plugins: string[]): Promise<string[]> 
         HttpStatus.NOT_FOUND,
       );
     }
-  
+
     const output = await this.setupService.runKubectlCommand(
       setup.nameSpace,
       setup.podName,
       command,
     );
     const siteIconUrl = { siteIconUrl: output.trim() };
-  
+
     return siteIconUrl;
   }
-  
 }
-
-
-

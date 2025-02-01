@@ -10,6 +10,11 @@ import {
   InternalServerErrorException,
   NotFoundException,
   Query,
+  Put,
+  Patch,
+  HttpException,
+  HttpStatus,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupService } from '../services/setup.service';
@@ -17,6 +22,7 @@ import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
 import { Throttle } from '@nestjs/throttler';
 import { KubernetesService } from '../services/kubernetes.service';
+import { UpdateRedirectDto } from '../dto/update-redirect.dto';
 
 // @UseGuards(AuthGuard)
 @Controller('wordpress')
@@ -53,7 +59,12 @@ export class SetupController {
     @Query('limit') limit: string = '100',
   ) {
     const lineLimit = parseInt(limit, 10);
-    return await this.setupService.getPodLogFile(namespace, podName, logFile, lineLimit);
+    return await this.setupService.getPodLogFile(
+      namespace,
+      podName,
+      logFile,
+      lineLimit,
+    );
   }
 
   @Throttle({ default: { limit: 1, ttl: 2000 } })
@@ -64,8 +75,7 @@ export class SetupController {
     @Req() req: any,
     @Param('id') setupId: string,
   ) {
-    if (!wpAdminPassword || typeof wpAdminPassword !
-      == 'string') {
+    if (!wpAdminPassword || typeof wpAdminPassword! == 'string') {
       throw new BadRequestException(
         'Invalid wpAdminPassword: Must be a non-empty string.',
       );
@@ -108,6 +118,47 @@ export class SetupController {
   }
 
   @Roles(Role.USER)
+  @Get('redirect/:setupId')
+  async getRedirect(@Param('setupId', ParseIntPipe) setupId: number) {
+    const redirects = await this.setupService.findBySetupId(setupId);
+
+    if (!redirects || redirects.length === 0) {
+      throw new HttpException(
+        `No redirects found for setupId ${setupId}`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return {
+      setupId,
+      redirects,
+    };
+  }
+
+  @Roles(Role.USER)
+  @Post('redirect/:setupId')
+  async updateRedirect(
+    @Param('setupId') setupId: string,
+    @Body() updateRedirectDto: UpdateRedirectDto,
+  ) {
+    const { statusCode, oldUrl, newUrl, action } = updateRedirectDto;
+    const numericSetupId = parseInt(setupId, 10);
+
+    try {
+      await this.k8sService.updateRedirectConfig(
+        numericSetupId,
+        oldUrl,
+        newUrl,
+        statusCode,
+        action,
+      );
+      return { message: 'Redirect rule updated successfully' };
+    } catch (error) {
+      return { message: `Error: ${error.message}` };
+    }
+  }
+
+  @Roles(Role.USER)
   @Get('/wordpress:id')
   async findOne(@Param('id') id: string) {
     const setupId = Number(id);
@@ -137,6 +188,39 @@ export class SetupController {
       return await this.setupService.findByTitle();
     } catch (error) {
       throw new InternalServerErrorException('Unable to fetch site title');
+    }
+  }
+
+  @Roles(Role.USER)
+  @Patch('php-version/:setupId')
+  async updatePhpVersion(
+    @Param('setupId') setupId: string,
+    @Body('phpVersion') phpVersion: string,
+  ) {
+    const numericSetupId = parseInt(setupId, 10);
+    await this.k8sService.updatePhpFpmVersion(numericSetupId, phpVersion);
+    return { message: `PHP version updated to ${phpVersion}.` };
+  }
+
+  @Roles(Role.USER)
+  @Post('restart/engine/:setupId')
+  async restartPhpEngine(
+    @Param('setupId') setupId: string,
+  ): Promise<{ message: string }> {
+    try {
+      const numericSetupId = parseInt(setupId, 10);
+      if (isNaN(numericSetupId)) {
+        throw new HttpException('Invalid setup ID', HttpStatus.BAD_REQUEST);
+      }
+
+      await this.k8sService.restartPhpEngine(numericSetupId);
+
+      return { message: `PHP engine restarted` };
+    } catch (error) {
+      throw new HttpException(
+        `Failed to restart PHP engine: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 

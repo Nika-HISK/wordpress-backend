@@ -2,7 +2,6 @@ import {
   Controller,
   Body,
   Post,
-  Req,
   Param,
   Get,
   Query,
@@ -15,7 +14,6 @@ import {
 import { wpcliService } from '../services/wpcli.service';
 import { Roles } from 'src/auth/guard/jwt-roles.guard';
 import { Role } from 'src/auth/guard/enum/role.enum';
-import shellEscape from 'shell-escape';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   ApiWpCoreCheckUpdate,

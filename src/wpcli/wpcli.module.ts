@@ -12,13 +12,14 @@ import { WpThemeRepository } from './repositories/wpTheme.repository';
 import { WpUser } from './entities/wpUser.entity';
 import { WpUserRepository } from './repositories/wpUser.repository';
 import { SetupService } from 'src/setup/services/setup.service';
-import { SetupModule } from 'src/setup/setup.module';
 import { SetupRepository } from 'src/setup/repositories/setup.repository';
 import { KubernetesService } from 'src/setup/services/kubernetes.service';
+import { Redirect } from 'src/setup/entities/redirect.entity';
+import { RedirectRepository } from 'src/setup/repositories/redirect.repository';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Setup, User, wpPlugin, wpTheme, WpUser, ]), UserModule],
+  imports: [TypeOrmModule.forFeature([Setup, User, wpPlugin, wpTheme, WpUser, Redirect]), UserModule],
   controllers: [wpcliController],
-  providers: [wpcliService, WpPluginRepository, WpThemeRepository, WpUserRepository, SetupService, SetupRepository, KubernetesService],
+  providers: [wpcliService, WpPluginRepository, WpThemeRepository, WpUserRepository, SetupService, SetupRepository, KubernetesService, RedirectRepository],
 })
 export class WpcliModule {}
