@@ -17,6 +17,13 @@ import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
+
+    ConfigModule.forRoot({
+      isGlobal: true, // Makes variables globally available
+      envFilePath: '.env', // Optionally use this if you have a .env file locally
+    }),
+
+
     ThrottlerModule.forRoot([
       {
         name: 'short',
@@ -37,11 +44,11 @@ import { BackupModule } from './backup/backup.module';
     ConfigModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'mysql',
-      host: process.env.DATABASE_HOST,
+      host: 'mysql',
       port: 3306,
-      username: process.env.DATABASE_USERNAME,
-      password: process.env.DATABASE_PASSWORD,
-      database: process.env.DATABASE_NAME,
+      username: 'root',
+      password: 'Xalxtamdzleveli1',
+      database: 'wordpress-backend',
       autoLoadEntities: true,
       synchronize: true,
     }),
