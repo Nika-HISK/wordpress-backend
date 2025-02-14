@@ -21,6 +21,9 @@ export class Setup extends baseEntity {
   @Column()
   siteTitle: string;
 
+  @Column({nullable: true})
+  label: string
+
   @Column({ unique: true })
   podName: string;
 

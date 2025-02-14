@@ -173,6 +173,56 @@ export class SetupRepository {
     return usernames;
   }
 
+  async createLabel(setupId: number, label: string) {
+    const setup = await this.findOne(setupId)
+
+    if (!setup) {
+      throw new HttpException('Setup not found', HttpStatus.BAD_REQUEST);
+    }
+    setup.label = label
+
+    await this.setupRepository.save(setup)
+  }
+
+  async updateLabel(setupId: number, label: string) {
+    const setup = await this.findOne(setupId);
+  
+    if (!setup) {
+      throw new HttpException('Setup not found', HttpStatus.BAD_REQUEST);
+    }
+  
+    setup.label = label;
+
+    await this.setupRepository.save(setup)
+
+    return label
+}
+
+  async deleteLabel(setupId: number) {
+    const setup = await this.findOne(setupId);
+  
+    if (!setup) {
+      throw new HttpException('Setup not found', HttpStatus.BAD_REQUEST);
+    }
+
+    setup.label = null
+
+    await this.setupRepository.save(setup)
+    
+    return {message: 'label succesfully deleted'}
+  }
+
+  async getLabel(setupId: number) {
+    const setup = await this.findOne(setupId)
+
+    if (!setup) {
+      throw new HttpException('Setup not found', HttpStatus.BAD_REQUEST);
+    }
+    console.log(setup.label, 'bugoor chumad');
+    
+    return setup.label
+  }
+
   async updateSiteName(setupId: number, siteName: string): Promise<void> {
     const setup = await this.setupRepository.findOne({
       where: { id: setupId },

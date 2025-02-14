@@ -23,6 +23,7 @@ import { Role } from 'src/auth/guard/enum/role.enum';
 import { Throttle } from '@nestjs/throttler';
 import { KubernetesService } from '../services/kubernetes.service';
 import { UpdateRedirectDto } from '../dto/update-redirect.dto';
+import { CreateLabelDto } from '../dto/create-label.dto';
 
 // @UseGuards(AuthGuard)
 @Controller('wordpress')
@@ -49,6 +50,37 @@ export class SetupController {
       );
     }
   }
+
+  @Roles(Role.USER)
+  @Post('label/:id')
+  async createLabel(@Param('id') setupId: string, @Body() createLabelDto: CreateLabelDto) {
+    return await this.setupService.createLabel(+setupId, createLabelDto.label)
+  }
+
+  @Roles(Role.USER)
+  @Patch('label/:id')
+  async updateLabel(
+    @Param('id') setupId: string, 
+    @Body() updateLabelDto: CreateLabelDto
+  ) {
+    return await this.setupService.updateLabel(+setupId, updateLabelDto.label);
+  }
+  
+  @Roles(Role.USER)
+  @Get('label/:id')
+  async getLabel(@Param('id') setupId: string) {
+    return await this.setupService.getLabel(+setupId)
+  }
+
+  @Roles(Role.USER)
+  @Delete('label/:id')
+  async deleteLabel(@Param('id') setupId: string) {
+    return await this.setupService.deleteLabel(+setupId);
+  }
+
+
+  
+
 
   @Roles(Role.USER)
   @Get(':namespace/logs/:podName')

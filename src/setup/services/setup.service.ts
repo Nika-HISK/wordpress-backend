@@ -745,6 +745,25 @@ export class SetupService {
     return this.redirectRepository.findBySetupId(setupId);
   }
 
+  async createLabel(setupId: number, label: string) {
+    return await this.setupRepository.createLabel(setupId, label)
+  }
+
+  async updateLabel(setupId: number, label: string) {
+    return await this.setupRepository.updateLabel(setupId, label);
+  
+  }
+  
+  async deleteLabel(setupId: number) {
+    await this.setupRepository.deleteLabel(setupId);
+  
+  }
+  
+
+  async getLabel(setupId: number) {
+    return await this.setupRepository.getLabel(setupId)
+  }
+
   async findAll() {
     return await this.setupRepository.findAll();
   }
