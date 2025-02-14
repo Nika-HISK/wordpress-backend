@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Setup } from '../entities/setup.entity';
 import { Repository } from 'typeorm';
@@ -68,7 +68,7 @@ export class SetupRepository {
     siteName: string,
     phpAdminFullIp: string,
     instanceId: string,
-    phpDeployment: string
+    phpDeployment: string,
   ): Promise<Setup> {
     const encryptedMysqlPassword = this.encrypt(mysqlPassword);
     const hashedPassword = await bcrypt.hash(
@@ -94,9 +94,9 @@ export class SetupRepository {
     newSetup.wpfullIp = wpfullIp;
     newSetup.siteName = siteName;
     newSetup.mysqlPassword = encryptedMysqlPassword;
-    newSetup.phpAdminFullIp = phpAdminFullIp
-    newSetup.instanceId = instanceId
-    newSetup.phpDeployment = phpDeployment
+    newSetup.phpAdminFullIp = phpAdminFullIp;
+    newSetup.instanceId = instanceId;
+    newSetup.phpDeployment = phpDeployment;
     newSetup.phpAdminFullIp = phpAdminFullIp;
     newSetup.instanceId = instanceId;
 
@@ -171,5 +171,16 @@ export class SetupRepository {
       throw new HttpException('No setups found with usernames', 404);
     }
     return usernames;
+  }
+
+  async updateSiteName(setupId: number, siteName: string): Promise<void> {
+    const setup = await this.setupRepository.findOne({
+      where: { id: setupId },
+    });
+    if (!setup) {
+      throw new HttpException('Setup not found', HttpStatus.BAD_REQUEST);
+    }
+    setup.siteName = siteName;
+    await this.setupRepository.save(setup);
   }
 }

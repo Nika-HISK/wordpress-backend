@@ -33,7 +33,9 @@ export class SetupService {
     const kubectlCommand = `kubectl exec ${podName} -n ${namespace} -c ${containerName} -- ${command}`;
 
     try {
-      const { stdout, stderr } = await execAsync(kubectlCommand, {maxBuffer: Infinity});
+      const { stdout, stderr } = await execAsync(kubectlCommand, {
+        maxBuffer: Infinity,
+      });
       if (stderr) {
         console.error(`Error executing command "${command}":`, stderr);
       }
@@ -543,7 +545,7 @@ export class SetupService {
     );
     const wpDeployment = `wordpress-${instanceId}`;
     const sqlDeployment = `mysql-${instanceId}`;
-    const phpDeployment = `phpadmin-${instanceId}`
+    const phpDeployment = `phpadmin-${instanceId}`;
     const replicaSets = await this.k8sService.listReplicaSets(namespace);
     const wpReplicaSet = replicaSets.find((rs) =>
       rs.metadata?.ownerReferences?.some(
@@ -587,7 +589,7 @@ export class SetupService {
       siteName,
       phpAdminFullIp,
       instanceId,
-      phpDeployment
+      phpDeployment,
     );
 
     await this.updateNginxErrorLogLevel(namespace, podName, 'debug');
@@ -605,14 +607,13 @@ export class SetupService {
         throw new NotFoundException(`Setup with ID ${setupId} not found`);
       }
 
-      const wpService = `wordpress-${setup.instanceId}`
-      const sqlService = `mysql-${setup.instanceId}`
-      const phpService = `phpadmin-${setup.instanceId}`
-      const nginxConfig = `nginx-config-${setup.instanceId}`
-      const wpPvc = `wordpress-pvc-${setup.instanceId}`
-      const sqlPvc = `mysql-pvc-${setup.instanceId}`
-      const sqlSecret = `mysql-secret-${setup.instanceId}`
-
+      const wpService = `wordpress-${setup.instanceId}`;
+      const sqlService = `mysql-${setup.instanceId}`;
+      const phpService = `phpadmin-${setup.instanceId}`;
+      const nginxConfig = `nginx-config-${setup.instanceId}`;
+      const wpPvc = `wordpress-pvc-${setup.instanceId}`;
+      const sqlPvc = `mysql-pvc-${setup.instanceId}`;
+      const sqlSecret = `mysql-secret-${setup.instanceId}`;
 
       await execAsync(
         `kubectl delete deployment ${setup.wpDeployment} -n ${setup.nameSpace}`,
@@ -640,13 +641,9 @@ export class SetupService {
       await execAsync(
         `kubectl delete configmap ${nginxConfig} -n ${setup.nameSpace}`,
       );
-      await execAsync(
-        `kubectl delete pvc ${wpPvc} -n ${setup.nameSpace}`,
-      );
+      await execAsync(`kubectl delete pvc ${wpPvc} -n ${setup.nameSpace}`);
 
-      await execAsync(
-        `kubectl delete pvc ${sqlPvc} -n ${setup.nameSpace}`,
-      );
+      await execAsync(`kubectl delete pvc ${sqlPvc} -n ${setup.nameSpace}`);
 
       await execAsync(
         `kubectl delete secret ${sqlSecret} -n ${setup.nameSpace}`,
@@ -654,15 +651,15 @@ export class SetupService {
 
       await new Promise((resolve) => setTimeout(resolve, 10000));
 
-      await new Promise<void>((resolve) => 
-      setTimeout(async () => {
-        await execAsync(
-          `kubectl get pv -o jsonpath='{range .items[?(@.status.phase=="Released")]}{.metadata.name}{"\n"}{end}' | xargs -I{} kubectl delete pv {} -n ${setup.nameSpace}`
-        );
-        resolve();
-      }, 5000)
-    );
-        
+      await new Promise<void>((resolve) =>
+        setTimeout(async () => {
+          await execAsync(
+            `kubectl get pv -o jsonpath='{range .items[?(@.status.phase=="Released")]}{.metadata.name}{"\n"}{end}' | xargs -I{} kubectl delete pv {} -n ${setup.nameSpace}`,
+          );
+          resolve();
+        }, 5000),
+      );
+
       return await this.setupRepository.deleteSetup(setupId);
     } catch (error) {
       throw new InternalServerErrorException(
@@ -754,11 +751,14 @@ export class SetupService {
 
   async findOne(id: number) {
     const setup = await this.setupRepository.findOne(id);
-    if(!setup) {
+    if (!setup) {
       throw new HttpException('setup not found', HttpStatus.BAD_REQUEST);
     }
-    return setup
-    
+    return setup;
+  }
+
+  async updateSiteName(setupId: number, siteName: string): Promise<void> {
+    await this.setupRepository.updateSiteName(setupId, siteName);
   }
 
   async findByTitle() {

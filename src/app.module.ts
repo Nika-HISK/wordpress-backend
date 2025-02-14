@@ -19,8 +19,8 @@ import { BackupModule } from './backup/backup.module';
   imports: [
 
     ConfigModule.forRoot({
-      isGlobal: true, // Makes variables globally available
-      envFilePath: '.env', // Optionally use this if you have a .env file locally
+      isGlobal: true,
+      envFilePath: '.env',
     }),
 
 

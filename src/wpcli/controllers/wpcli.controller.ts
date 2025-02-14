@@ -283,15 +283,21 @@ export class wpcliController {
   @Roles(Role.USER)
   @ApiWpUserDelete()
   @Delete('wpuser/:setupId')
-  async wpUserDelete(
+  async wpUsersDelete(
     @Param('setupId') setupId: number,
-    @Body('userId') userId: number,
+    @Body('userId') userId: number[],
   ) {
+    if (!Array.isArray(userId) || userId.length === 0) {
+      throw new HttpException(
+        'User IDs array is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     try {
-      return await this.wpCliService.wpUserDelete(setupId, userId);
+      return await this.wpCliService.wpUsersDelete(setupId, userId);
     } catch (error) {
       throw new HttpException(
-        error.message || 'Failed to delete user',
+        error.message || 'Failed to delete users',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

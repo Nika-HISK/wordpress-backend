@@ -203,6 +203,17 @@ export class SetupController {
   }
 
   @Roles(Role.USER)
+  @Patch('site-name/:setupId')
+  async updateSiteName(
+    @Param('setupId') setupId: string,
+    @Body('siteName') siteName: string,
+  ) {
+    const numericSetupId = parseInt(setupId, 10);
+    await this.setupService.updateSiteName(numericSetupId, siteName);
+    return { message: `Site name updated to ${siteName}.` };
+  }
+
+  @Roles(Role.USER)
   @Post('restart/engine/:setupId')
   async restartPhpEngine(
     @Param('setupId') setupId: string,

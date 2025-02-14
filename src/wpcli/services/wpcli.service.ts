@@ -344,18 +344,7 @@ export class wpcliService {
     return wpUsers;
   }
 
-  async wpUserDelete(setupId: number, targetUserId: number): Promise<string> {
-    if (!targetUserId) {
-      throw new HttpException(
-        'Target user ID is required',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    await this.wpUserRepository.deleteWpUsers(targetUserId);
-
-    const command = `wp user delete ${targetUserId} --yes --allow-root`;
-
+  async wpUsersDelete(setupId: number, userIds: number[]): Promise<string[]> {
     const setup = await this.setupService.findOne(setupId);
     if (!setup) {
       throw new HttpException(
@@ -363,16 +352,38 @@ export class wpcliService {
         HttpStatus.NOT_FOUND,
       );
     }
-
-    await this.setupService.runKubectlCommand(
-      setup.nameSpace,
-      setup.podName,
-      command,
-    );
-
-    return `User with ID ${targetUserId} has been deleted from WordPress`;
+  
+    const results: string[] = [];
+    for (const userId of userIds) {
+      if (!userId) {
+        results.push(`Invalid user ID: ${userId}`);
+        continue;
+      }
+  
+      const command = `wp user delete ${userId} --yes --allow-root`;
+      try {
+        // Capture both stdout and stderr from the command
+        const result = await this.setupService.runKubectlCommand(
+          setup.nameSpace,
+          setup.podName,
+          command,
+        );
+  
+        // Check for specific warning messages in the output
+        if (result.includes("Warning: Invalid user ID, email or login")) {
+          results.push(`User with ID ${userId} does not exist.`);
+        } else {
+          results.push(`User with ID ${userId} has been deleted.`);
+        }
+      } catch (error) {
+        results.push(`Error deleting user with ID ${userId}: ${error.message}`);
+      }
+    }
+  
+    return results;
   }
-
+  
+  
   async wpUserRoleUpdate(
     setupId: number,
     userId: number,
