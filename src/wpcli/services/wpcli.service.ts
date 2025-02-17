@@ -510,8 +510,8 @@ export class wpcliService {
       setup.podName,
       command,
     );
-    return JSON.parse(output);
-  }
+    const parsedOutput = JSON.parse(output);
+    return parsedOutput[0];  }
 
   async wpRoles(setupId: number): Promise<any> {
     const setup = await this.setupService.findOne(setupId);

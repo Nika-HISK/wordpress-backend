@@ -218,7 +218,6 @@ export class SetupRepository {
     if (!setup) {
       throw new HttpException('Setup not found', HttpStatus.BAD_REQUEST);
     }
-    console.log(setup.label, 'bugoor chumad');
     
     return setup.label
   }
