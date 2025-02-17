@@ -1,9 +1,9 @@
 import { Controller, Post, Body, Param, Delete, Get, Put, Patch } from '@nestjs/common';
 import { BackupService } from '../services/backup.service';
 import { CreateBackupDto } from '../dto/create-backup.dto';
-import { Roles } from 'src/auth/guard/jwt-roles.guard';
-import { Role } from 'src/auth/guard/enum/role.enum';
 import { CreateS3BackupDto } from '../dto/create-s3Backup.dto';
+import { Roles } from 'src/auth/guards/roles.guard';
+import { Role } from 'src/auth/enum/role.enum';
 
 @Controller('backup')
 export class BackupController {

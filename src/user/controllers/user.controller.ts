@@ -3,9 +3,8 @@ import { UserService } from '../services/user.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { UserRepository } from '../repositories/user.repository';
-import { Roles } from 'src/auth/guard/jwt-roles.guard';
-import { Role } from 'src/auth/guard/enum/role.enum';
-import { ExtendedRequest } from 'src/auth/dto/extended-request.interface';
+import { Roles } from 'src/auth/guards/roles.guard';
+import { Role } from 'src/auth/enum/role.enum';
 
 
 @Controller('user')
@@ -14,7 +13,7 @@ export class UserController {
 
   @Roles(Role.USER, Role.ADMIN)
   @Get('me')
-  async me(@Req() req: ExtendedRequest) {
+  async me(@Req() req: any) {
     const userId = req.user.id
     return await this.userService.me(userId)
   }

@@ -12,8 +12,6 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { wpcliService } from '../services/wpcli.service';
-import { Roles } from 'src/auth/guard/jwt-roles.guard';
-import { Role } from 'src/auth/guard/enum/role.enum';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   ApiWpCoreCheckUpdate,
@@ -37,6 +35,8 @@ import {
   ApiWpUserList,
   ApiWpUserRoleUpdate,
 } from '../Decorators/wp-cli-swagger.decorator';
+import { Roles } from 'src/auth/guards/roles.guard';
+import { Role } from 'src/auth/enum/role.enum';
 
 @ApiTags('WP CLI')
 @ApiBearerAuth()

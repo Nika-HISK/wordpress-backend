@@ -2,8 +2,8 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, Upl
 import { FilesService } from '../services/files.service';
 import { CreateFileDto } from '../dto/create-file.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Roles } from 'src/auth/guard/jwt-roles.guard';
-import { Role } from 'src/auth/guard/enum/role.enum';
+import { Roles } from 'src/auth/guards/roles.guard';
+import { Role } from 'src/auth/enum/role.enum';
 
 // @UseGuards(LocalAuthGuard)
 @Controller('files')

@@ -18,12 +18,12 @@ import {
 } from '@nestjs/common';
 import { CreateSetupDto } from '../dto/create-setup.dto';
 import { SetupService } from '../services/setup.service';
-import { Roles } from 'src/auth/guard/jwt-roles.guard';
-import { Role } from 'src/auth/guard/enum/role.enum';
 import { Throttle } from '@nestjs/throttler';
 import { KubernetesService } from '../services/kubernetes.service';
 import { UpdateRedirectDto } from '../dto/update-redirect.dto';
 import { CreateLabelDto } from '../dto/create-label.dto';
+import { Role } from 'src/auth/enum/role.enum';
+import { Roles } from 'src/auth/guards/roles.guard';
 
 // @UseGuards(AuthGuard)
 @Controller('wordpress')
