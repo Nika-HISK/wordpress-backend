@@ -1,6 +1,6 @@
 # 🚀 WordPress Hosting Platform Backend
 
-This project is the backend service for a scalable WordPress hosting platform. It leverages **NestJS**, **TypeORM**, **Swagger**, and **Kubernetes** to dynamically provision and manage isolated WordPress instances for each user using **WP-CLI**.
+This project is the backend service for a scalable WordPress hosting platform. It leverages **NestJS**, **TypeORM**, **Swagger**, and **Kubernetes** to dynamically provision and manage isolated WordPress instances for each user using **WP-CLI**. Media uploads and user backups are stored securely on **AWS S3**.
 
 ---
 
@@ -11,6 +11,7 @@ This project is the backend service for a scalable WordPress hosting platform. I
 - **Swagger** – Auto-generated API documentation
 - **Kubernetes** – Each user gets their own namespace for isolation
 - **WP-CLI** – Command-line tool to control WordPress instances
+- **AWS S3** – Used to store user media (images) and backups
 
 ---
 
@@ -20,6 +21,7 @@ This project is the backend service for a scalable WordPress hosting platform. I
 - Automated WordPress deployments per namespace
 - Full WordPress lifecycle management (install, update, delete) via WP-CLI
 - RESTful API with Swagger documentation
+- Media and backups stored on S3
 - Secure, scalable, and containerized
 
 ---
